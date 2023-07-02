@@ -3,7 +3,36 @@ import torch.nn as nn
 import torch.nn.functional as F
 from segmentation_models_pytorch.losses import DiceLoss
 
-from training.lovasz import lovasz_loss
+from training.lovasz import lovasz_hinge, lovasz_sym
+
+
+class FocalLoss(nn.Module):
+    def __init__(self, gamma=2, reduction="mean"):
+        super().__init__()
+        self.gamma = gamma
+        self.reduction = reduction
+
+    def forward(self, input, target):
+        # n = input.shape[-1]
+        input = input.view(-1).float()
+        target = target.view(-1).float()
+        loss = -target * F.logsigmoid(input) * torch.exp(
+            self.gamma * F.logsigmoid(-input)
+        ) - (1.0 - target) * F.logsigmoid(-input) * torch.exp(
+            self.gamma * F.logsigmoid(input)
+        )
+        loss = 100 * loss
+        return loss.mean() if self.reduction == "mean" else loss
+
+
+class LovaszFocalLoss(nn.Module):
+    def __init__(self, gamma=2, alpha=0.7, reduction="mean"):
+        super().__init__()
+        self.focal_loss = FocalLoss(gamma, reduction=reduction)
+        self.alpha = alpha
+
+    def forward(self, x, y):
+        return self.focal_loss(x, y) + self.alpha * lovasz_sym(x, y, per_image=False)
 
 
 class ContrailLoss(nn.Module):
@@ -43,7 +72,11 @@ class ContrailLoss(nn.Module):
         if config["name"] == "bce":
             self.loss = nn.BCEWithLogitsLoss(reduction="none")
         elif config["name"] == "lovasz":
-            self.loss = lovasz_loss
+            self.loss = lovasz_sym
+        elif config["name"] == "focal":
+            self.loss = FocalLoss(gamma=2, reduction="mean")
+        elif config["name"] == "lovasz_focal":
+            self.loss = LovaszFocalLoss(reduction="mean")
         elif config["name"] == "dice":
             loss = DiceLoss(mode="binary", smooth=1)
         else:

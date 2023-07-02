@@ -2,6 +2,8 @@ import torch
 import torch.nn as nn
 import segmentation_models_pytorch
 
+from model_zoo.unet import Unet
+
 
 DECODERS = [
     "Unet",
@@ -24,6 +26,9 @@ def define_model(
     n_channels=3,
     pretrained_weights=None,
     reduce_stride=False,
+    use_pixel_shuffle=False,
+    use_hypercolumns=False,
+    center="none",
     use_cls=False,
     verbose=0,
 ):
@@ -42,12 +47,12 @@ def define_model(
     """
     assert decoder_name in DECODERS, "Decoder name not supported"
 
-    decoder = getattr(segmentation_models_pytorch, decoder_name)
+    if decoder_name == "Unet":
+        decoder = Unet
+    else:
+        decoder = getattr(segmentation_models_pytorch, decoder_name)
     
     if pretrained_weights is not None:
-        raise NotImplementedError
-
-    if reduce_stride:
         raise NotImplementedError
         
     model = decoder(
@@ -55,10 +60,23 @@ def define_model(
         encoder_weights=encoder_weights if pretrained else None,
         in_channels=n_channels,
         classes=num_classes,
+        use_pixel_shuffle=use_pixel_shuffle,
+        use_hypercolumns=use_hypercolumns,
+        center=center,
         aux_params={"dropout": 0.2, "classes": num_classes} if use_cls else None
     )
     model.num_classes = num_classes
 
+    if reduce_stride:
+        model.encoder.model.conv_stem.stride = (1, 1)
+        model.decoder.blocks[-1].upscale = False
+        model.decoder.blocks[-1].pixel_shuffle = nn.Identity()
+
+        if reduce_stride >= 2:
+            model.encoder.model.blocks[1][0].conv_exp.stride = (1, 1)
+            model.decoder.blocks[-2].upscale = False
+            model.decoder.blocks[-2].pixel_shuffle = nn.Identity()
+        
     return SegWrapper(model, use_cls)
 
 

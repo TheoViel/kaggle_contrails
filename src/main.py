@@ -77,27 +77,30 @@ class Config:
     # Data
     processed_folder = "false_color/"
     size = 256
-    aug_strength = 2
+    aug_strength = 3
 
     # k-fold
     k = 4
     folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0]  # , 1, 2, 3]
+    selected_folds = [0, 1, 2, 3]
 
     # Model
     encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s
     decoder_name = "Unet"
 
     pretrained_weights = None
-    reduce_stride = False
+    reduce_stride = True
+    use_pixel_shuffle = False
+    use_hypercolumns = False
+    center = "none"
     n_channels = 3
     num_classes = 1
     
     # Training
     loss_config = {
-        "name": "bce",  # ce
+        "name": "bce",  # bce lovasz_focal lovasz focal
         "smoothing": 0.,
-        "activation": "sigmoid",  # "sigmoid",  # None for lovasz
+        "activation": "sigmoid",
         "aux_loss_weight": 0.,
         "activation_aux": "sigmoid",
         "ousm_k": 0,
@@ -122,7 +125,7 @@ class Config:
         "weight_decay": 0,
     }
 
-    epochs = 50
+    epochs = 30
     two_stage = False
 
     use_fp16 = True

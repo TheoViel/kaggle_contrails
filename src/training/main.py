@@ -64,6 +64,9 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         n_channels=config.n_channels,
         pretrained_weights=pretrained_weights,
         reduce_stride=config.reduce_stride,
+        use_pixel_shuffle=config.use_pixel_shuffle,
+        use_hypercolumns=config.use_hypercolumns,
+        center=config.center,
         use_cls=config.loss_config['aux_loss_weight'] > 0,
         verbose=(config.local_rank == 0),
     ).cuda()

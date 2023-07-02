@@ -92,12 +92,12 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0):
             ]
         elif strength == 3:
             augs = [
-                albu.HorizontalFlip(p=0.5),
-                albu.VerticalFlip(p=0.5),
+#                 albu.HorizontalFlip(p=0.5),
+#                 albu.VerticalFlip(p=0.5),
                 albu.ShiftScaleRotate(
-                    scale_limit=0.25,
+                    scale_limit=0.2,
                     shift_limit=0.2,
-                    rotate_limit=45,
+                    rotate_limit=30,
                     p=0.75,
                 ),
                 color_transforms(p=0.5),
