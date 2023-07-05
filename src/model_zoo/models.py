@@ -4,7 +4,6 @@ import segmentation_models_pytorch
 
 from model_zoo.unet import Unet
 
-
 DECODERS = [
     "Unet",
     "Linknet",
@@ -48,36 +47,53 @@ def define_model(
     assert decoder_name in DECODERS, "Decoder name not supported"
 
     if decoder_name == "Unet":
-        decoder = Unet
+        model = Unet(
+            encoder_name="tu-" + encoder_name,
+            encoder_weights=encoder_weights if pretrained else None,
+            in_channels=n_channels,
+            classes=num_classes,
+            use_pixel_shuffle=use_pixel_shuffle,
+            use_hypercolumns=use_hypercolumns,
+            center=center,
+            aux_params={"dropout": 0.2, "classes": num_classes} if use_cls else None,
+        )
+    elif decoder_name == "FPN" and "nextvit" in encoder_name:
+        from mmseg.models import build_segmentor
+        from mmcv.utils import Config
+        import sys
+        sys.path.append('../nextvit/segmentation/')
+        from nextvit import nextvit_small
+        
+        cfg = Config.fromfile(f"../nextvit/segmentation/configs/fpn_512_{encoder_name}_80k.py")
+        model = build_segmentor(cfg.model)
+        if pretrained:
+            state_dict = torch.load(f'../input/fpn_80k_{encoder_name}_1n1k6m_pretrained.pth')["state_dict"]
+            del state_dict['decode_head.conv_seg.weight'], state_dict['decode_head.conv_seg.bias']
+            model.load_state_dict(state_dict, strict=False)
+        model.backbone.stem[0].conv.stride = (1, 1)
+        model.backbone.stem[3].conv.stride = (1, 1)
+        model = nn.Sequential(model.backbone, model.neck, model.decode_head)
+        
     else:
         decoder = getattr(segmentation_models_pytorch, decoder_name)
-    
+        model = decoder(
+            encoder_name="tu-" + encoder_name,
+            encoder_weights=encoder_weights if pretrained else None,
+            in_channels=n_channels,
+            classes=num_classes,
+            aux_params={"dropout": 0.2, "classes": num_classes} if use_cls else None,
+            upsampling=int(4 // 2 ** reduce_stride),
+        )
+
     if pretrained_weights is not None:
         raise NotImplementedError
-        
-    model = decoder(
-        encoder_name="tu-" + encoder_name,
-        encoder_weights=encoder_weights if pretrained else None,
-        in_channels=n_channels,
-        classes=num_classes,
-        use_pixel_shuffle=use_pixel_shuffle,
-        use_hypercolumns=use_hypercolumns,
-        center=center,
-        aux_params={"dropout": 0.2, "classes": num_classes} if use_cls else None
-    )
+
     model.num_classes = num_classes
-
-    if reduce_stride:
-        model.encoder.model.conv_stem.stride = (1, 1)
-        model.decoder.blocks[-1].upscale = False
-        model.decoder.blocks[-1].pixel_shuffle = nn.Identity()
-
-        if reduce_stride >= 2:
-            model.encoder.model.blocks[1][0].conv_exp.stride = (1, 1)
-            model.decoder.blocks[-2].upscale = False
-            model.decoder.blocks[-2].pixel_shuffle = nn.Identity()
         
-    return SegWrapper(model, use_cls)
+    model = SegWrapper(model, use_cls)
+    model.reduce_stride(encoder_name, decoder_name, reduce_stride)
+
+    return model
 
 
 class SegWrapper(nn.Module):
@@ -102,8 +118,41 @@ class SegWrapper(nn.Module):
         self.num_classes = model.num_classes
         self.use_cls = use_cls
 
-    def reduce_stride(self):
-        raise NotImplementedError
+    def reduce_stride(self, encoder_name, decoder_name="Unet", reduce_stride=0):
+        if "nextvit" in encoder_name:
+            return
+
+        if reduce_stride == 0:
+            return
+
+        if "nfnet" in encoder_name:
+            self.model.encoder.model.stem_conv1.stride = (1, 1)
+        elif "efficientnet" in encoder_name:
+            self.model.encoder.model.conv_stem.stride = (1, 1)
+        elif "resnet" in encoder_name or "resnext" in encoder_name:
+            self.model.encoder.model.conv1.stride = (1, 1)
+        elif "convnext" in encoder_name:
+            self.model.encoder.stem[0].stride = (2, 2)
+            self.model.encoder.stem[0].padding = (1, 1)
+        else:
+            raise NotImplementedError
+
+        if decoder_name == "Unet":
+            if len(self.model.decoder.blocks) >= 5:
+                self.model.decoder.blocks[4].upscale = False
+                self.model.decoder.blocks[4].pixel_shuffle = nn.Identity()
+
+        if reduce_stride >= 2:
+            if "efficientnetv2" in encoder_name:
+                self.model.encoder.model.blocks[1][0].conv_exp.stride = (1, 1)
+            elif "efficientnet" in encoder_name:
+                self.model.encoder.model.blocks[1][0].conv_dw.stride = (1, 1)
+            elif "convnext" in encoder_name:
+                self.model.encoder.stem[0].stride = (1, 1)
+            if decoder_name == "Unet":
+                if len(self.model.decoder.blocks) >= 4:
+                    self.model.decoder.blocks[3].upscale = False
+                    self.model.decoder.blocks[3].pixel_shuffle = nn.Identity()
 
     def forward(self, x):
         """

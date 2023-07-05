@@ -126,7 +126,7 @@ class Lookahead(Optimizer):
         self.optimizer.add_param_group(param_group)
 
 
-def define_optimizer(model, name, lr=1e-3, weight_decay=0, betas=(0.9, 0.999)):
+def define_optimizer(model, name, lr=1e-3, lr_encoder=1e-3, weight_decay=0, betas=(0.9, 0.999)):
     """
     Defines an optimizer for the given model based on the specified name.
 
@@ -143,16 +143,17 @@ def define_optimizer(model, name, lr=1e-3, weight_decay=0, betas=(0.9, 0.999)):
     Returns:
         torch.optim.Optimizer: The defined optimizer.
     """
-    if weight_decay:
+    if weight_decay or lr != lr_encoder:
         no_decay = ["bias", "LayerNorm.bias", "LayerNorm.weight"]
         opt_params = []
         for n, p in model.named_parameters():
             wd = 0 if any(nd in n for nd in no_decay) else weight_decay
+            lr_ = lr_encoder if "encoder" in n else lr
             opt_params.append(
                 {
                     "params": [p],
                     "weight_decay": wd,
-                    "lr": lr,
+                    "lr": lr_,
                 }
             )
     else:

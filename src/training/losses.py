@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from segmentation_models_pytorch.losses import DiceLoss
 
-from training.lovasz import lovasz_hinge, lovasz_sym
+from training.lovasz import lovasz_sym
 
 
 class FocalLoss(nn.Module):
@@ -34,6 +34,16 @@ class LovaszFocalLoss(nn.Module):
     def forward(self, x, y):
         return self.focal_loss(x, y) + self.alpha * lovasz_sym(x, y, per_image=False)
 
+
+class LovaszBCELoss(nn.Module):
+    def __init__(self, alpha=0.01, reduction="mean"):
+        super().__init__()
+        self.bce = nn.BCEWithLogitsLoss(reduction=reduction)
+        self.alpha = alpha
+
+    def forward(self, x, y):
+        return self.bce(x, y) + self.alpha * lovasz_sym(x, y, per_image=False)
+    
 
 class ContrailLoss(nn.Module):
     """
@@ -77,6 +87,8 @@ class ContrailLoss(nn.Module):
             self.loss = FocalLoss(gamma=2, reduction="mean")
         elif config["name"] == "lovasz_focal":
             self.loss = LovaszFocalLoss(reduction="mean")
+        elif config["name"] == "lovasz_bce":
+            self.loss = LovaszBCELoss(reduction="mean")
         elif config["name"] == "dice":
             loss = DiceLoss(mode="binary", smooth=1)
         else:
@@ -98,8 +110,9 @@ class ContrailLoss(nn.Module):
         if self.config["name"] == "ce":
             y = y.squeeze()
             y_aux = y_aux.squeeze()
-        else:  # bce, lovasz
+        else:  # bce, lovasz, focal
             y = y.float()
+#             print(y.size(), pred.size())
             pred = pred.float().view(y.size())
             
         y_aux = y_aux.float()

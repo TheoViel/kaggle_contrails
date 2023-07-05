@@ -1,3 +1,4 @@
+import timm
 import torch
 import numpy as np
 import torch.nn as nn
@@ -14,6 +15,7 @@ from segmentation_models_pytorch.base import (
 )
 
 from model_zoo.aspp import ASPP
+import model_zoo.nextvit as nextvit
 
 
 class DecoderBlock(nn.Module):
@@ -147,9 +149,12 @@ class UnetDecoder(nn.Module):
                 
 
     def forward(self, *features):
-
         features = features[1:]  # remove first skip with same spatial resolution
         features = features[::-1]  # reverse channels to start from head of encoder
+        
+#         for ft in features:
+#             print(ft.size())
+#         print()
 
         head = features[0]
         skips = features[1:]
@@ -159,6 +164,8 @@ class UnetDecoder(nn.Module):
         xs = []
         for i, decoder_block in enumerate(self.blocks):
             skip = skips[i] if i < len(skips) else None
+            
+#             print(i, x.size(), skip.size() if skip is not None else None)
             x = decoder_block(x, skip)
             xs.append(x)
 #             print(x.size())
@@ -177,6 +184,20 @@ class UnetDecoder(nn.Module):
 #             print(x.size())
 
         return x
+
+
+def convnext_forward_features(self, x):
+    fts = [x]
+    x = self.stem(x)
+    
+    if (x.size(-1) % 8) != 0:
+        x = F.pad(x, [0, 1, 0, 1], value=0.0)
+
+    for stage in self.stages:
+        x = stage(x)
+        fts.append(x)
+    
+    return fts
 
 
 class Unet(SegmentationModel):
@@ -241,12 +262,34 @@ class Unet(SegmentationModel):
     ):
         super().__init__()
 
-        self.encoder = get_encoder(
-            encoder_name,
-            in_channels=in_channels,
-            depth=encoder_depth,
-            weights=encoder_weights,
-        )
+        if "nextvit" in encoder_name:
+            assert in_channels == 3
+            self.encoder = getattr(nextvit, encoder_name[3:])(pretrained=encoder_weights)
+            encoder_depth = 4
+            decoder_channels = decoder_channels[:encoder_depth]
+        elif "convnext" in encoder_name:
+            self.encoder = timm.create_model(encoder_name[3:] + ".fcmae", pretrained=encoder_weights)
+            self.encoder.head = nn.Identity()
+            self.encoder.forward = lambda x: convnext_forward_features(self.encoder, x)
+            if "tiny" in encoder_name:
+                self.encoder.out_channels = [3, 96, 192, 384, 768]
+            elif "base" in encoder_name:
+                self.encoder.out_channels = [3, 128, 256, 512, 1024]
+            elif "nano" in encoder_name:
+                self.encoder.out_channels = [3, 80, 160, 320, 640]
+            else:
+                print('Check encoder channels !!')
+                self.encoder.out_channels = [3, 128, 256, 512, 1024]
+            self.encoder.output_stride = 32
+            encoder_depth = 4
+            decoder_channels = decoder_channels[:encoder_depth]
+        else:
+            self.encoder = get_encoder(
+                encoder_name,
+                in_channels=in_channels,
+                depth=encoder_depth,
+                weights=encoder_weights,
+            )
 
         self.decoder = UnetDecoder(
             encoder_channels=self.encoder.out_channels,

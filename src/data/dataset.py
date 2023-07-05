@@ -1,3 +1,5 @@
+import os
+import re
 import cv2
 import torch
 import numpy as np
@@ -7,6 +9,7 @@ from torch.utils.data import Dataset
 class ContrailDataset(Dataset):
     """
     Image torch Dataset.
+    TODO
 
     Methods:
         __init__(df, transforms): Constructor
@@ -25,6 +28,7 @@ class ContrailDataset(Dataset):
         self,
         df,
         transforms=None,
+        use_soft_mask=False,
     ):
         """
         Constructor.
@@ -34,9 +38,11 @@ class ContrailDataset(Dataset):
             transforms (albumentation transforms, optional): Transforms to apply. Defaults to None.
         """
         self.df = df
+        self.transforms = transforms
+        self.use_soft_mask = use_soft_mask
+
         self.img_paths = df["img_path"].values
         self.mask_paths = df["mask_path"].values
-        self.transforms = transforms
         self.targets = df["has_contrail"].values
 
     def __len__(self):
@@ -61,9 +67,20 @@ class ContrailDataset(Dataset):
             torch tensor [1]: Sample weight.
         """
         image = cv2.imread(self.img_paths[idx])
-        mask = cv2.imread(self.mask_paths[idx], 0)
         
-#         plot_sample(image, mask[..., None])
+#         image_ = cv2.imread(re.sub("false_color/", "reg/", self.img_paths[idx]))
+#         image[:, :, 0] = image_.mean(-1).astype(np.uint8)
+
+        if self.use_soft_mask:
+            mask_path = self.mask_paths[idx]
+            folder = mask_path[:-4].rsplit('/', 3)[0] + "/train/" + mask_path[:-4].split('/')[-1]
+            indiv_masks_path = folder + "/human_individual_masks.npy"
+            if os.path.exists(indiv_masks_path):
+                mask = np.load(indiv_masks_path).mean(-1).squeeze(-1)
+            else:
+                mask = cv2.imread(mask_path, 0)
+        else:
+            mask = cv2.imread(self.mask_paths[idx], 0)
 
         if self.transforms:
             transformed = self.transforms(image=image, mask=mask)

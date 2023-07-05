@@ -78,27 +78,28 @@ class Config:
     processed_folder = "false_color/"
     size = 256
     aug_strength = 3
+    use_soft_mask = True
 
     # k-fold
     k = 4
     folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0, 1, 2, 3]
+    selected_folds = [0] #, 1, 2, 3]
 
     # Model
-    encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s
+    encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
     decoder_name = "Unet"
 
     pretrained_weights = None
-    reduce_stride = True
+    reduce_stride = 2
     use_pixel_shuffle = False
     use_hypercolumns = False
     center = "none"
     n_channels = 3
     num_classes = 1
-    
+
     # Training
     loss_config = {
-        "name": "bce",  # bce lovasz_focal lovasz focal
+        "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
         "smoothing": 0.,
         "activation": "sigmoid",
         "aux_loss_weight": 0.,
@@ -107,8 +108,8 @@ class Config:
     }
 
     data_config = {
-        "batch_size": 16,
-        "val_bs": 32,
+        "batch_size": 8,
+        "val_bs": 16,
         "mix": "cutmix",
         "mix_proba": 0.5,
         "mix_alpha": 5,
@@ -118,14 +119,15 @@ class Config:
 
     optimizer_config = {
         "name": "AdamW",
-        "lr": 2e-3,
-        "warmup_prop": 0.,
+        "lr": 2e-4,
+        "lr_encoder": 2e-4,
+        "warmup_prop": 0.05,
         "betas": (0.9, 0.999),
-        "max_grad_norm": 10.0,
-        "weight_decay": 0,
+        "max_grad_norm": 1.0,
+        "weight_decay": 0.05,
     }
 
-    epochs = 30
+    epochs = 40
     two_stage = False
 
     use_fp16 = True

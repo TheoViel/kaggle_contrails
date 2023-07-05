@@ -34,3 +34,4 @@ notebooks/.ipynb_checkpoints/
 src/core
 wandb/
 runs/
+nextvit/

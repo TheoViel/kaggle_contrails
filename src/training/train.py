@@ -71,29 +71,6 @@ def evaluate(
 
             meter.update(y, y_aux, y_pred, y_pred_aux)
 
-#     val_losses = torch.stack(val_losses)
-#     unions = torch.cat(meter.unions, 0)
-#     intersections = torch.cat(meter.intersections, 0)
-#     accs = torch.cat(meter.accs, 0)
-
-#     if distributed:
-#         val_losses = sync_across_gpus(val_losses, world_size)
-#         unions = sync_across_gpus(unions, world_size)
-#         intersections = sync_across_gpus(intersections, world_size)
-#         accs = sync_across_gpus(accs, world_size)
-#         torch.distributed.barrier()
-
-# #     print(intersections.sum(), unions.sum())
-#     if local_rank == 0:
-#         dice = (2 * intersections.sum() / unions.sum()).item()
-#         acc = accs.mean().item()
-#         if not loss_config['aux_loss_weight']:
-#             acc = 0
-#         val_loss = val_losses.cpu().numpy().mean()
-#         return val_loss, dice, acc
-#     else:
-#         return 0, 0, 0
-
     val_losses = torch.stack(val_losses)
     accs = torch.cat(meter.accs, 0)
     if distributed:
@@ -176,6 +153,7 @@ def fit(
         model,
         optimizer_config["name"],
         lr=optimizer_config["lr"],
+        lr_encoder=optimizer_config["lr_encoder"],
         betas=optimizer_config["betas"],
         weight_decay=optimizer_config["weight_decay"],
     )
