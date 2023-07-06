@@ -3,6 +3,7 @@ import time
 import torch
 import operator
 import numpy as np
+from tqdm import tqdm
 from transformers import get_linear_schedule_with_warmup
 
 from data.loader import define_loaders
@@ -163,6 +164,7 @@ def fit(
         val_dataset,
         batch_size=data_config["batch_size"],
         val_bs=data_config["val_bs"],
+        num_workers=data_config["num_workers"],
         distributed=distributed,
         world_size=world_size,
         local_rank=local_rank,
@@ -201,7 +203,7 @@ def fit(
             except AttributeError:
                 train_loader.batch_sampler.sampler.set_epoch(epoch)
 
-        for img, y, y_aux in train_loader:
+        for img, y, y_aux in tqdm(train_loader, disable=False):
             img = img.cuda()
             y = y.cuda()
             y_aux = y_aux.cuda()

@@ -142,18 +142,18 @@ class Cutmix(nn.Module):
 
         bbx1, bby1, bbx2, bby2, coeff = self.rand_bbox(x.size(), coeff)
 
-        if n_dims == 3:
+        if n_dims == 3:  # bs x h x w
             x[:, bbx1:bbx2, bby1:bby2] = x[perm, bbx1:bbx2, bby1:bby2]
-        elif n_dims == 4:
+        elif n_dims == 4:  # bs x channels x h x w
             x[:, :, bbx1:bbx2, bby1:bby2] = x[perm, :, bbx1:bbx2, bby1:bby2]
         else:
             raise NotImplementedError
 
         # y is a mask
         n_dims = len(y.shape)
-        if n_dims == 3:
+        if n_dims == 3:  # bs x h x w
             y[:, bbx1:bbx2, bby1:bby2] = y[perm, bbx1:bbx2, bby1:bby2]
-        elif n_dims == 4:
+        elif n_dims == 4:  # bs x classes x h x w
             y[:, :, bbx1:bbx2, bby1:bby2] = y[perm, :, bbx1:bbx2, bby1:bby2]
         else:
             raise NotImplementedError

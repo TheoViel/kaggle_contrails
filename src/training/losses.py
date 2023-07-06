@@ -74,7 +74,8 @@ class ContrailLoss(nn.Module):
         super().__init__()
         self.config = config
         self.device = device
-
+    
+        self.shape_loss_w = config['shape_loss_w']
         self.aux_loss_weight = config["aux_loss_weight"]
         self.ousm_k = config.get("ousm_k", 0)
         self.eps = config.get("smoothing", 0)
@@ -94,7 +95,12 @@ class ContrailLoss(nn.Module):
         else:
             raise NotImplementedError
 
-        self.loss_aux = nn.BCEWithLogitsLoss(reduction="none")
+        self.loss_aux = nn.BCEWithLogitsLoss(reduction="mean")
+        if config['shape_loss'] == "bce":
+            self.shape_loss = nn.BCEWithLogitsLoss(reduction="mean")
+        else:  # mse
+            self.shape_loss = nn.MSELoss(reduction="mean")
+        
 
     def prepare(self, pred, pred_aux, y, y_aux):
         """
@@ -136,9 +142,21 @@ class ContrailLoss(nn.Module):
         Returns:
             torch.Tensor: Loss value.
         """
+        y_shape = None
+        if self.shape_loss_w and y.size(1) > 6:
+            pred_shape, y_shape = pred[:, -6:].contiguous(), y[:, -6:].contiguous()
+            pred, y = pred[:, :-6].contiguous(), y[:, :-6].contiguous()
+        else:
+            pred = pred[:, :y.size(1)]
+
         pred, pred_aux, y, y_aux = self.prepare(pred, pred_aux, y, y_aux)
 
         loss = self.loss(pred, y)
+
+        if self.shape_loss_w and y_shape is not None:
+#             loss_shape = self.mse(pred_shape, y_shape)
+            shape_loss = self.shape_loss(pred_shape, y_shape)
+            loss += self.shape_loss_w * shape_loss
 
         if self.ousm_k:
             raise NotImplementedError
@@ -151,6 +169,6 @@ class ContrailLoss(nn.Module):
         if not self.aux_loss_weight > 0:
             return loss
         
-        loss_aux = self.loss_aux(pred_aux, y_aux).mean()
+        loss_aux = self.loss_aux(pred_aux, y_aux)
         return (1 - self.aux_loss_weight) * loss + self.aux_loss_weight * loss_aux
 

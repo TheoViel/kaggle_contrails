@@ -75,6 +75,7 @@ def define_loaders(
     distributed=False,
     world_size=0,
     local_rank=0,
+    num_workers=0,
 ):
     """
     Define data loaders for training and validation datasets.
@@ -121,7 +122,7 @@ def define_loaders(
         pin_memory=True,
         worker_init_fn=worker_init_fn,
         collate_fn=None,
-        persistent_workers=True,
+        persistent_workers=True,  # num_workers > 0,
     )
 
     val_loader = DataLoader(
@@ -132,7 +133,7 @@ def define_loaders(
         num_workers=NUM_WORKERS,
         pin_memory=True,
         collate_fn=None,
-        persistent_workers=True,
+        persistent_workers=True,  # num_workers > 0,
     )
 
     return train_loader, val_loader

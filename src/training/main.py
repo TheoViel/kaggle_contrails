@@ -39,6 +39,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         df_train_.reset_index(drop=True),
         transforms=get_transfos(strength=config.aug_strength),
         use_soft_mask=config.use_soft_mask,
+        use_shape_descript=config.use_shape_descript,
     )
 
     val_dataset = ContrailDataset(

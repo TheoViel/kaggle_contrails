@@ -81,7 +81,7 @@ def define_model(
             encoder_weights=encoder_weights if pretrained else None,
             in_channels=n_channels,
             classes=num_classes,
-            aux_params={"dropout": 0.2, "classes": num_classes} if use_cls else None,
+            aux_params={"dropout": 0.2, "classes": 1} if use_cls else None,
             upsampling=int(4 // 2 ** reduce_stride),
         )
 
@@ -168,4 +168,4 @@ class SegWrapper(nn.Module):
         if self.use_cls:
             return self.model(x)
         else:
-            return self.model(x), torch.zeros(x.size(0), self.num_classes).to(x.device)
+            return self.model(x), torch.zeros(x.size(0), 1).to(x.device)

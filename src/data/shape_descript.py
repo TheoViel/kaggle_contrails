@@ -1,10 +1,11 @@
+import time
 import numpy as np
 import gunpowder as gp
 from numpy.lib.stride_tricks import as_strided
 from scipy.ndimage import convolve, gaussian_filter
 
 
-def get_shapedescript(
+def get_shape_descript(
     segmentation,
     sigma,
     components=None,
@@ -97,6 +98,7 @@ class ShapeDescript(object):
         coords = self.coords[(sub_shape, sub_voxel_size)]
 
         # for all labels
+       
         for label in labels:
             if label == 0:
                 continue
@@ -106,19 +108,24 @@ class ShapeDescript(object):
             try:
                 # 3d by default
                 sub_mask = mask[::df, ::df, ::df]
-
             except Exception:
                 sub_mask = mask[::df, ::df]
-
+                
+#             return descriptors
+        
+            # SLOW - 70 ms
             sub_descriptor = np.concatenate(
                 self.__get_stats(coords, sub_mask, sub_sigma_voxel, sub_roi, components)
             )
 
+#             t0 = time.time()
             descriptor = self.__upsample(sub_descriptor, df)
+#             t1 = time.time()
+#             print(f'{(t1 - t0) * 1000 :.3f}ms - upsample')
+            
             descriptors += descriptor * mask[roi_slices]
 
         # normalize stats
-
         # get max possible mean offset for normalization
         if self.mode == "gaussian":
             # farthest voxel in context is 3*sigma away, but due to Gaussian
@@ -169,7 +176,6 @@ class ShapeDescript(object):
             # covariance (yy,xx) = [2,3]
             # pearsons (yx) = [4]
             # size = [5]
-
             if components is None:
                 # mean offsets in [0, 1]
                 descriptors[[0, 1]] = (
@@ -204,9 +210,13 @@ class ShapeDescript(object):
         masked_coords = coords * mask
 
         # number of inside voxels
+        
+#         t0 = time.time()
         count = self.__aggregate(mask, sigma_voxel, self.mode, roi)
 
         count_len = len(count.shape)
+        
+#         t1 = time.time()
 
         # avoid division by zero
         count[count == 0] = 1
@@ -221,6 +231,8 @@ class ShapeDescript(object):
         )
 
         mean /= count
+        
+#         t2 = time.time()
 
         if components is not None:
             calc_mean_offset = True in [
@@ -234,6 +246,8 @@ class ShapeDescript(object):
             mean_offset = mean - coords[(slice(None),) + roi.to_slices()]
 
         # covariance
+#         t3 = time.time()
+
         if components is None or calc_covariance:
             coords_outer = self.__outer_product(masked_coords)
 
@@ -290,6 +304,13 @@ class ShapeDescript(object):
                 variance[0] /= self.sigma[0] ** 2
                 variance[1] /= self.sigma[1] ** 2
 
+#         t4 = time.time()
+        
+#         print(f'{(t4 - t3) * 1000 :.3f}ms - variance')
+#         print(f'{(t3 - t2) * 1000 :.3f}ms - mean_offset')
+#         print(f'{(t2 - t1) * 1000 :.3f}ms - mean')
+#         print(f'{(t1 - t0) * 1000 :.3f}ms - count')
+        
         if components is not None:
             ret = tuple()
 
