@@ -154,7 +154,6 @@ class ContrailLoss(nn.Module):
         loss = self.loss(pred, y)
 
         if self.shape_loss_w and y_shape is not None:
-#             loss_shape = self.mse(pred_shape, y_shape)
             shape_loss = self.shape_loss(pred_shape, y_shape)
             loss += self.shape_loss_w * shape_loss
 

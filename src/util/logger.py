@@ -141,15 +141,6 @@ def init_neptune(config, log_folder):
 
 
 def get_size(folder):
-    """
-    Computes the size of a folder.
-
-    Args:
-        folder (str): Folder.
-
-    Returns:
-        int: Folder size.
-    """
     total_size = 0
     for dirpath, dirnames, filenames in os.walk(folder):
         for f in filenames:
@@ -164,20 +155,24 @@ def get_size(folder):
 
 def upload_to_kaggle(folders, directory, dataset_name, update_folders=True):
     """
-    Uploads folders to a kaggle dataset.
-
+    TODO
     Args:
-        folders (list of strings): Folders to upload
-        directory (str): Folder to store the dataset in.
-        dataset_name (str): Kaggle dtaset name.
-        update_folders (bool, optional): Whether to update already uploaded folders.
+        folders (_type_): _description_
+        directory (_type_): _description_
+        dataset_name (_type_): _description_
     """
     os.makedirs(directory, exist_ok=True)
 
     for folder in folders:
         print(f"- Copying {folder} ...")
         name = "_".join(folder[:-1].split("/")[-2:])
-        shutil.copyfile(folder + "model.tflite", directory + name + "_model.tflite")
+        try:
+            shutil.copytree(folder, directory + name)
+        except FileExistsError:
+            if update_folders:
+                shutil.rmtree(directory + name)
+                shutil.copytree(folder, directory + name)
+            continue
 
     print(f"\nDataset size : {get_size(directory):.3f} Go")
 

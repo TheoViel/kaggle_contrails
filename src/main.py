@@ -1,6 +1,3 @@
-import cv2
-cv2.setNumThreads(0)
-
 import os
 import time
 import torch
@@ -88,7 +85,7 @@ class Config:
     # k-fold
     k = 4
     folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0]  # 1, 2, 3]
+    selected_folds = [1, 2, 3]  # [0]
 
     # Model
     encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
@@ -122,7 +119,7 @@ class Config:
         "mix_alpha": 5,
         "additive_mix": True,
         "num_classes": num_classes,
-        "num_workers": 0,  #  if use_shape_descript else 8,
+        "num_workers": 0 if use_shape_descript else 8,
     }
 
     optimizer_config = {
@@ -274,7 +271,7 @@ if __name__ == "__main__":
         config.data_config["val_bs"] = args.batch_size
 
     df = prepare_data(DATA_PATH, Config.processed_folder)
-    
+
     if config.selected_folds == [1, 2, 3]:
         if "fold" not in df.columns:
             folds = pd.read_csv(config.folds_file)
@@ -318,7 +315,7 @@ if __name__ == "__main__":
 
     from training.main import k_fold
 #     df = df.head(1000)
-    k_fold(Config, df, log_folder=log_folder, run=run)
+    k_fold(Config, df, log_folder=None, run=None)
 
     if config.local_rank == 0:
         print("\nDone !")

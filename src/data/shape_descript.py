@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import gunpowder as gp
+
 from numpy.lib.stride_tricks import as_strided
 from scipy.ndimage import convolve, gaussian_filter
 

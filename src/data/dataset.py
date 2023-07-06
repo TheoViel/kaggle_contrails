@@ -91,14 +91,14 @@ class ContrailDataset(Dataset):
             
         mask = mask.unsqueeze(0).float()  # H x W x 1
         
-#         if self.use_shape_descript:
-#             from data.shape_descript import get_shape_descript
-#             shape_descript = get_shape_descript(
-#                 segmentation=(mask[0].numpy() > 0.5), sigma=(10, 10), voxel_size=(1, 1), downsample=2
-#             )
-#             shape_descript[-1] *= 4
-#             shape_descript = np.clip(shape_descript, 0, 1)
-#             mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
+        if self.use_shape_descript:
+            from data.shape_descript import get_shape_descript
+            shape_descript = get_shape_descript(
+                segmentation=(mask[0].numpy() > 0.5), sigma=(10, 10), voxel_size=(1, 1), downsample=2
+            )
+            shape_descript[-1] *= 4
+            shape_descript = np.clip(shape_descript, 0, 1)
+            mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
 
         y = torch.tensor([self.targets[idx]], dtype=torch.float)
 

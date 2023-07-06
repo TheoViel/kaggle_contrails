@@ -4,7 +4,6 @@ from torch.utils.data.sampler import Sampler
 from torch.utils.data.distributed import DistributedSampler
 
 from util.torch import worker_init_fn
-from params import NUM_WORKERS
 
 
 class OrderedDistributedSampler(Sampler):
@@ -118,11 +117,11 @@ def define_loaders(
         sampler=sampler,
         shuffle=sampler is None,
         drop_last=True,
-        num_workers=NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
         worker_init_fn=worker_init_fn,
         collate_fn=None,
-        persistent_workers=True,  # num_workers > 0,
+        persistent_workers=num_workers > 0,
     )
 
     val_loader = DataLoader(
@@ -130,10 +129,10 @@ def define_loaders(
         batch_size=val_bs,
         sampler=val_sampler,
         shuffle=False,
-        num_workers=NUM_WORKERS,
+        num_workers=num_workers,
         pin_memory=True,
         collate_fn=None,
-        persistent_workers=True,  # num_workers > 0,
+        persistent_workers=num_workers > 0,
     )
 
     return train_loader, val_loader
