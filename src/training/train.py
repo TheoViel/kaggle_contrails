@@ -203,7 +203,7 @@ def fit(
             except AttributeError:
                 train_loader.batch_sampler.sampler.set_epoch(epoch)
 
-        for img, y, y_aux in tqdm(train_loader, disable=False):
+        for img, y, y_aux in tqdm(train_loader, disable=True):
             img = img.cuda()
             y = y.cuda()
             y_aux = y_aux.cuda()

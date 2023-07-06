@@ -5,6 +5,8 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
+from data.preparation import load_record, get_false_color_img
+
 
 class ContrailDataset(Dataset):
     """
@@ -168,7 +170,6 @@ class ContrailInfDataset(Dataset):
             mask = masks['human_pixel_masks']
         except KeyError:
             mask = 0
-            
 
         if self.transforms:
             transformed = self.transforms(image=image)

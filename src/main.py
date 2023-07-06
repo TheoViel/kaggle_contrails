@@ -132,7 +132,7 @@ class Config:
         "weight_decay": 0.2,  # 0.05
     }
 
-    epochs = 1
+    epochs = 40
     two_stage = False
 
     use_fp16 = True

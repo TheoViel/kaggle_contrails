@@ -20,6 +20,51 @@ class Config:
             setattr(self, k, v)
 
 
+def predict_multi(models, dataset, loss_config, batch_size=64, device="cuda", use_fp16=False, num_workers=8):
+    """
+    Perform model inference on a dataset.
+
+    Args:
+        model (nn.Module): Trained model for inference.
+        dataset (Dataset): Dataset to perform inference on.
+        loss_config (dict): Loss configuration.
+        batch_size (int, optional): Batch size for inference. Defaults to 64.
+        device (str, optional): Device to use for inference. Defaults to "cuda".
+        use_fp16 (bool, optional): Whether to use mixed precision inference. Defaults to False.
+
+    Returns:
+        preds (numpy.ndarray): Predicted probabilities of shape (num_samples, num_classes).
+        preds_aux (numpy.ndarray): Auxiliary predictions of shape (num_samples, num_aux_classes).
+    """
+    for model in models:
+        model.eval()
+    preds, preds_aux = [], []
+
+    loader = DataLoader(
+        dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
+    )
+
+    with torch.no_grad():
+        for img, _, _ in tqdm(loader):
+            preds_model = []
+            for model in models:
+                with torch.cuda.amp.autocast(enabled=use_fp16):
+                    pred, _ = model(img.cuda())
+
+                pred = pred[:, :1]  # 1st class only
+
+                # Get probabilities
+                if loss_config["activation"] == "sigmoid":
+                    pred = pred.sigmoid()
+                elif loss_config["activation"] == "softmax":
+                    pred = pred.softmax(-1)
+
+                preds_model.append(pred.detach().cpu().numpy())
+            preds.append(np.mean(preds_model, 0))
+
+    return np.concatenate(preds), []
+
+
 def predict(model, dataset, loss_config, batch_size=64, device="cuda", use_fp16=False, num_workers=8):
     """
     Perform model inference on a dataset.
