@@ -132,7 +132,7 @@ class Config:
         "weight_decay": 0.2,  # 0.05
     }
 
-    epochs = 40
+    epochs = 1
     two_stage = False
 
     use_fp16 = True
@@ -292,7 +292,7 @@ if __name__ == "__main__":
     except Exception:
         run = None
         if config.local_rank == 0:
-            run = init_neptune(Config, log_folder)
+#             run = init_neptune(Config, log_folder)
 
             if args.fold > -1:
                 config.selected_folds = [args.fold]
@@ -315,7 +315,7 @@ if __name__ == "__main__":
 
     from training.main import k_fold
 #     df = df.head(1000)
-    k_fold(Config, df, log_folder=None, run=None)
+    k_fold(Config, df, log_folder=log_folder, run=run)
 
     if config.local_rank == 0:
         print("\nDone !")

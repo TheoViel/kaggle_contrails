@@ -103,3 +103,75 @@ class ContrailDataset(Dataset):
         y = torch.tensor([self.targets[idx]], dtype=torch.float)
 
         return image, mask, y
+
+
+class ContrailInfDataset(Dataset):
+    """
+    Image torch Dataset.
+    TODO
+
+    Methods:
+        __init__(df, transforms): Constructor
+        __len__(): Get the length of the dataset
+        __getitem__(idx): Get an item from the dataset
+
+    Attributes:
+        df (pandas DataFrame): Metadata
+        img_paths (numpy array): Paths to the images
+        mask_paths (numpy array): Paths to the masks
+        transforms (albumentation transforms): Transforms to apply
+        targets (numpy array): Target labels
+    """
+
+    def __init__(
+        self,
+        folders,
+        transforms=None,
+    ):
+        """
+        Constructor.
+
+        Args:
+            df (pandas DataFrame): Metadata.
+            transforms (albumentation transforms, optional): Transforms to apply. Defaults to None.
+        """
+        self.folders = folders
+        self.transforms = transforms
+
+    def __len__(self):
+        """
+        Get the length of the dataset.
+
+        Returns:
+            int: Length of the dataset
+        """
+        return len(self.folders)
+
+    def __getitem__(self, idx):
+        """
+        Item accessor.
+
+        Args:
+            idx (int): Index.
+
+        Returns:
+            np array [H x W x C]: Image.
+            torch tensor [1]: Label.
+            torch tensor [1]: Sample weight.
+        """
+        bands, masks = load_record(self.folders[idx], folder="")
+        false_color = get_false_color_img(bands)
+        image = false_color[..., 4]
+        image = (image * 255).astype(np.uint8)
+
+        try:
+            mask = masks['human_pixel_masks']
+        except KeyError:
+            mask = 0
+            
+
+        if self.transforms:
+            transformed = self.transforms(image=image)
+            image = transformed["image"]
+
+        return image, mask, 0

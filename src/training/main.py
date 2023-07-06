@@ -194,9 +194,6 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
             dices = train(
                 config, df_train, df_val, fold, log_folder=log_folder, run=run
             )
-
-            if log_folder is None:
-                return dices
             scores.append(dices)
 
     if config.local_rank == 0:
