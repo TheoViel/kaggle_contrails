@@ -107,8 +107,8 @@ class Cutmix(nn.Module):
         w = size[2]
         h = size[3]
         cut_rat = np.sqrt(1.0 - lam)
-        cut_w = np.int(w * cut_rat)
-        cut_h = np.int(h * cut_rat)
+        cut_w = int(w * cut_rat)
+        cut_h = int(h * cut_rat)
 
         # uniform
         cx = np.random.randint(w)
@@ -146,6 +146,8 @@ class Cutmix(nn.Module):
             x[:, bbx1:bbx2, bby1:bby2] = x[perm, bbx1:bbx2, bby1:bby2]
         elif n_dims == 4:  # bs x channels x h x w
             x[:, :, bbx1:bbx2, bby1:bby2] = x[perm, :, bbx1:bbx2, bby1:bby2]
+        elif n_dims == 5:  # bs x t x channels x h x w
+            x[:, :, :, bbx1:bbx2, bby1:bby2] = x[perm, :, :, bbx1:bbx2, bby1:bby2]
         else:
             raise NotImplementedError
 

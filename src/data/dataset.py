@@ -32,6 +32,8 @@ class ContrailDataset(Dataset):
         transforms=None,
         use_soft_mask=False,
         use_shape_descript=False,
+        use_pl_masks=False,
+        frames=4,
     ):
         """
         Constructor.
@@ -44,9 +46,14 @@ class ContrailDataset(Dataset):
         self.transforms = transforms
         self.use_soft_mask = use_soft_mask
         self.use_shape_descript = use_shape_descript
+        self.use_pl_masks = use_pl_masks
+        self.frames = frames
 
         self.img_paths = df["img_path"].values
         self.mask_paths = df["mask_path"].values
+        self.folders = df["folder"].values
+        self.ids = df["record_id"].values
+
         self.targets = df["has_contrail"].values
 
     def __len__(self):
@@ -70,19 +77,33 @@ class ContrailDataset(Dataset):
             torch tensor [1]: Label.
             torch tensor [1]: Sample weight.
         """
-        image = cv2.imread(self.img_paths[idx])
-        
-#         image_ = cv2.imread(re.sub("false_color/", "reg/", self.img_paths[idx]))
-#         image[:, :, 0] = image_.mean(-1).astype(np.uint8)
+        path = self.img_paths[idx]
+
+        if path.endswith('.png'):
+            assert self.frames == 4
+            image = cv2.imread(path)
+        else:
+            bands, _ = load_record(path, folder="", load_mask=False)
+            false_color = get_false_color_img(bands)
+            
+            if isinstance(self.frames, int):
+                image = false_color[..., self.frames]
+            else: # list, tuple
+                image = false_color[..., np.array(self.frames)]
+                image = image.reshape(image.shape[0], image.shape[1], -1)
+
+            image = (image * 255).astype(np.uint8)
 
         if self.use_soft_mask:
-            mask_path = self.mask_paths[idx]
-            folder = mask_path[:-4].rsplit('/', 3)[0] + "/train/" + mask_path[:-4].split('/')[-1]
-            indiv_masks_path = folder + "/human_individual_masks.npy"
+            indiv_masks_path = self.folders[idx] + "/human_individual_masks.npy"
             if os.path.exists(indiv_masks_path):
                 mask = np.load(indiv_masks_path).mean(-1).squeeze(-1)
             else:
-                mask = cv2.imread(mask_path, 0)
+                mask = cv2.imread(self.mask_paths[idx], 0)
+                
+            if self.use_pl_masks:
+                mask_pl = np.load(f'../logs/2023-07-06/23/pl_masks/{self.ids[idx]}.npy')
+                mask = (mask + mask_pl.astype(np.float32)) / 2
         else:
             mask = cv2.imread(self.mask_paths[idx], 0)
 
@@ -103,6 +124,11 @@ class ContrailDataset(Dataset):
             mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
 
         y = torch.tensor([self.targets[idx]], dtype=torch.float)
+        
+        if image.size(0) > 3:
+            image = image.view(3, -1, image.size(1), image.size(2)).transpose(0, 1)
+            
+#         print(image.shape)
 
         return image, mask, y
 
@@ -129,6 +155,7 @@ class ContrailInfDataset(Dataset):
         self,
         folders,
         transforms=None,
+        frames=4,
     ):
         """
         Constructor.
@@ -139,6 +166,7 @@ class ContrailInfDataset(Dataset):
         """
         self.folders = folders
         self.transforms = transforms
+        self.frames = frames
 
     def __len__(self):
         """
@@ -163,7 +191,13 @@ class ContrailInfDataset(Dataset):
         """
         bands, masks = load_record(self.folders[idx], folder="")
         false_color = get_false_color_img(bands)
-        image = false_color[..., 4]
+
+        if isinstance(self.frames, int):
+            image = false_color[..., self.frames]
+        else: # list, tuple
+            image = false_color[..., np.array(self.frames)]
+            image = image.reshape(image.shape[0], image.shape[1], -1)
+                
         image = (image * 255).astype(np.uint8)
 
         try:

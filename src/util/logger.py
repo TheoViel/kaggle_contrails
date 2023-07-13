@@ -123,7 +123,14 @@ def init_neptune(config, log_folder):
         Neptune run: Run.
     """
     print()
-    run = neptune.init_run(project=NEPTUNE_PROJECT)
+    run = neptune.init_run(
+        project=NEPTUNE_PROJECT,
+#         capture_hardware_metrics=False,
+#         capture_stdout=False,
+#         capture_stderr=False,
+#         flush_period=600,
+#         mode="sync",
+    )
 
     run["global/log_folder"] = log_folder
 
@@ -134,8 +141,6 @@ def init_neptune(config, log_folder):
             dic[k] = str(dic[k])
 
     run["global/parameters/"] = dic
-
-    run["global/config"].upload(log_folder + "config.json")
     print()
     return run
 

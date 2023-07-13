@@ -51,12 +51,14 @@ def prepare_folds(data_path="../input/", k=4):
     return df_folds[["record_id", "fold"]]
 
 
-def prepare_data(data_path="../input/", processed_folder="false_color/"):
+def prepare_data(data_path="../input/", processed_folder="false_color/", use_raw=False):
     df = pd.read_csv(os.path.join(data_path, processed_folder, "df.csv"))
+    if use_raw:
+        df['img_path'] = df['folder']
     return df
 
 
-def load_record(record_id, folder="../input/train/"):
+def load_record(record_id, folder="../input/train/", load_mask=True, bands_to_load=(15, 14, 11)):
     files = sorted(os.listdir(folder + record_id))
 
     bands, masks = {}, {}
@@ -64,9 +66,11 @@ def load_record(record_id, folder="../input/train/"):
     for f in files:
         if "band" in f:
             num = int(f.split(".")[0].split("_")[-1])
-            bands[num] = np.load(os.path.join(folder, record_id, f))
+            if num in bands_to_load:
+                bands[num] = np.load(os.path.join(folder, record_id, f))
         else:
-            masks[f[:-4]] = np.load(os.path.join(folder, record_id, f))
+            if load_mask:
+                masks[f[:-4]] = np.load(os.path.join(folder, record_id, f))
 
     return bands, masks
 

@@ -145,8 +145,12 @@ def kfold_inference(
         use_hypercolumns=config.use_hypercolumns,
         center=config.center,
         use_cls=config.loss_config['aux_loss_weight'] > 0,
-        pretrained=False,
-    ).cuda()
+        frames=config.frames if hasattr(config, "use_lstm") else 4,
+        use_lstm=config.use_lstm if hasattr(config, "use_lstm") else False,
+        bidirectional=config.bidirectional if hasattr(config, "bidirectional") else False,
+        use_cnn=config.use_cnn if hasattr(config, "use_cnn") else False,
+        kernel_size=config.kernel_size if hasattr(config, "kernel_size") else 1,
+    )
     model = model.cuda().eval()
 
     preds = []
@@ -156,8 +160,17 @@ def kfold_inference(
         weights = exp_folder + f"{config.decoder_name}_{config.encoder_name}_{fold}.pt"
         model = load_model_weights(model, weights, verbose=1)
 
+        df_val = df[df['fold'] == fold].reset_index(drop=True) if "fold" in df.columns else df
+        
+        try:
+            _ = config.frames
+        except:
+            config.frames = 4
+
         dataset = ContrailDataset(
-            df, transforms=get_transfos(augment=False),
+            df_val,
+            transforms=get_transfos(augment=False),
+            frames=config.frames if hasattr(config, "frames") else 4,
         )
 
         pred, _ = predict(
@@ -174,4 +187,4 @@ def kfold_inference(
 
         preds.append(pred)
 
-    return np.mean(preds, 0)
+    return preds

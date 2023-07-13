@@ -3,6 +3,7 @@ import time
 import torch
 import warnings
 import argparse
+import numpy as np
 import pandas as pd
 
 from data.preparation import prepare_data
@@ -11,6 +12,19 @@ from util.logger import create_logger, save_config, prepare_log_folder, init_nep
 from util.gpu_affinity import set_affinity
 
 from params import DATA_PATH
+
+    
+WEIGHTS = {
+    "tf_efficientnetv2_s":
+    {
+        1: "../logs/2023-07-03/30/",
+        2: "../logs/2023-07-03/35/",
+    },
+    "convnextv2_nano":
+    {
+        2: "../logs/2023-07-05/35/"  #
+    },
+}
 
 
 def parse_args():
@@ -64,85 +78,91 @@ def parse_args():
     return parser.parse_args()
 
 
-class Config:
-    """
-    Parameters used for training
-    """
+# class Config:
+#     """
+#     Parameters used for training
+#     """
 
-    # General
-    seed = 42
-    verbose = 1
-    device = "cuda"
-    save_weights = True
+#     # General
+#     seed = 42
+#     verbose = 1
+#     device = "cuda"
+#     save_weights = True
 
-    # Data
-    processed_folder = "false_color/"
-    size = 256
-    aug_strength = 3
-    use_soft_mask = True
-    use_shape_descript = False
+#     # Data
+#     processed_folder = "false_color/"
+#     use_raw = True
+#     frames = 4
+#     size = 256
+#     aug_strength = 3
+#     use_soft_mask = True
+#     use_shape_descript = False
+#     use_pl_masks = False
 
-    # k-fold
-    k = 4
-    folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [1, 2, 3]  # [0]
+#     # k-fold
+#     k = 4
+#     folds_file = f"../input/folds_{k}.csv"
+#     selected_folds = [0]  # 1, 2, 3]  # [0]
 
-    # Model
-    encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
-    decoder_name = "Unet"
+#     # Model
+#     encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
+#     decoder_name = "Unet"
+    
+#     use_lstm = False
+#     bidirectional = bool(np.max(frames) > 4)
 
-    pretrained_weights = None
-    reduce_stride = 2
-    use_pixel_shuffle = False
-    use_hypercolumns = False
-    center = "none"
-    n_channels = 3
-    num_classes = 7 if use_shape_descript else 1
+#     pretrained_weights = None
+#     reduce_stride = 1
+#     use_pixel_shuffle = False
+#     use_hypercolumns = False
+#     center = "none"
+#     n_channels = 3
+#     num_classes = 7 if use_shape_descript else 1
 
-    # Training
-    loss_config = {
-        "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-        "smoothing": 0.,
-        "activation": "sigmoid",
-        "aux_loss_weight": 0.,
-        "activation_aux": "sigmoid",
-        "ousm_k": 0,
-        "shape_loss_w": 0.1 if use_shape_descript else 0.,
-        "shape_loss": "bce",
-    }
+#     # Training
+#     loss_config = {
+#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
+#         "smoothing": 0.,
+#         "activation": "sigmoid",
+#         "aux_loss_weight": 0.,
+#         "activation_aux": "sigmoid",
+#         "ousm_k": 0,
+#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
+#         "shape_loss": "bce",
+#     }
 
-    data_config = {
-        "batch_size": 16,
-        "val_bs": 32,
-        "mix": "cutmix",
-        "mix_proba": 0.5,
-        "mix_alpha": 5,
-        "additive_mix": True,
-        "num_classes": num_classes,
-        "num_workers": 0 if use_shape_descript else 8,
-    }
+#     data_config = {
+#         "batch_size": 16,
+#         "val_bs": 32,
+#         "mix": "cutmix",
+#         "mix_proba": 0.5,
+#         "mix_alpha": 5,
+#         "additive_mix": True,
+#         "num_classes": num_classes,
+#         "num_workers": 0  #  if use_shape_descript else 8,
+#     }
 
-    optimizer_config = {
-        "name": "AdamW",
-        "lr": 1e-3,
-        "lr_encoder": 1e-3,
-        "warmup_prop": 0.,  # 0.05
-        "betas": (0.9, 0.999),
-        "max_grad_norm": 1.0,
-        "weight_decay": 0.2,  # 0.05
-    }
+#     optimizer_config = {
+#         "name": "AdamW",
+#         "lr": 1e-3,
+#         "lr_encoder": 1e-3,
+#         "warmup_prop": 0.,  # 0.05
+#         "betas": (0.9, 0.999),
+#         "max_grad_norm": 1.0,
+#         "weight_decay": 0.2,  # 0.05
+#     }
 
-    epochs = 40
-    two_stage = False
+#     epochs = 40
+#     two_stage = False
 
-    use_fp16 = True
-    model_soup = False
+#     use_fp16 = True
+#     model_soup = False
 
-    verbose = 1
-    verbose_eval = 200
+#     verbose = 1
+#     verbose_eval = 200
 
-    fullfit = False  # len(selected_folds) == 4
-    n_fullfit = 1
+#     fullfit = False  # len(selected_folds) == 4
+#     n_fullfit = 1
 
 
 # class Config:
@@ -158,10 +178,13 @@ class Config:
 
 #     # Data
 #     processed_folder = "false_color/"
+#     use_raw = True
+#     frames = 4
 #     size = 256
 #     aug_strength = 3
 #     use_soft_mask = True
 #     use_shape_descript = True
+#     use_pl_masks = False
 
 #     # k-fold
 #     k = 4
@@ -171,6 +194,9 @@ class Config:
 #     # Model
 #     encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
 #     decoder_name = "Unet"
+
+#     use_lstm = False
+#     bidirectional = bool(np.max(frames) > 4)
 
 #     pretrained_weights = None
 #     reduce_stride = 2
@@ -200,7 +226,7 @@ class Config:
 #         "mix_alpha": 5,
 #         "additive_mix": True,
 #         "num_classes": num_classes,
-#         "num_workers": 0 if use_shape_descript else 8,
+#         "num_workers": 0,  #  if use_shape_descript else 8,
 #     }
 
 #     optimizer_config = {
@@ -224,6 +250,96 @@ class Config:
 
 #     fullfit = False  # len(selected_folds) == 4
 #     n_fullfit = 1
+
+class Config:
+    """
+    Parameters used for training
+    """
+
+    # General
+    seed = 42
+    verbose = 1
+    device = "cuda"
+    save_weights = True
+
+    # Data
+    processed_folder = "false_color/"
+    use_raw = True
+    frames = [1, 2, 3, 4]  # [0, 1, 2, 3, 4, 5, 6, 7]
+    size = 256
+    aug_strength = 3
+    use_soft_mask = True
+    use_shape_descript = False
+    use_pl_masks = False
+
+    # k-fold
+    k = 4
+    folds_file = f"../input/folds_{k}.csv"
+    selected_folds = [0]  # 1, 2, 3]  # [0]
+
+    # Model
+    encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
+    decoder_name = "Unet"
+    reduce_stride = 2
+
+    use_lstm = False
+    bidirectional = bool(np.max(frames) > 4)
+    use_cnn = False
+    kernel_size = (1 if use_lstm else len(frames), 3, 3)
+    use_transfo = True
+
+    pretrained_weights = WEIGHTS[encoder_name][reduce_stride]  # None
+    
+    use_pixel_shuffle = False
+    use_hypercolumns = False
+    center = "none"
+    n_channels = 3
+    num_classes = 7 if use_shape_descript else 1
+
+    # Training
+    loss_config = {
+        "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
+        "smoothing": 0.,
+        "activation": "sigmoid",
+        "aux_loss_weight": 0.,
+        "activation_aux": "sigmoid",
+        "ousm_k": 0,
+        "shape_loss_w": 0.1 if use_shape_descript else 0.,
+        "shape_loss": "bce",
+    }
+
+    data_config = {
+        "batch_size": 8 if reduce_stride == 1 else 4,
+        "val_bs": 8,
+        "mix": "cutmix",
+        "mix_proba": 0.5,
+        "mix_alpha": 5,
+        "additive_mix": True,
+        "num_classes": num_classes,
+        "num_workers": 0 if use_shape_descript else 8,
+    }
+
+    optimizer_config = {
+        "name": "AdamW",
+        "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
+        "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
+        "warmup_prop": 0.  if pretrained_weights is None else 0.1,
+        "betas": (0.9, 0.999),
+        "max_grad_norm": 1.0,
+        "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
+    }
+
+    epochs = 10 if data_config["batch_size"] == 4 else 20
+    two_stage = False
+
+    use_fp16 = True
+    model_soup = False
+
+    verbose = 1
+    verbose_eval = 200
+
+    fullfit = False  # len(selected_folds) == 4
+    n_fullfit = 1
 
 
 if __name__ == "__main__":
@@ -270,7 +386,7 @@ if __name__ == "__main__":
         config.data_config["batch_size"] = args.batch_size
         config.data_config["val_bs"] = args.batch_size
 
-    df = prepare_data(DATA_PATH, Config.processed_folder)
+    df = prepare_data(DATA_PATH, Config.processed_folder, use_raw=Config.use_raw)
 
     if config.selected_folds == [1, 2, 3]:
         if "fold" not in df.columns:
@@ -292,7 +408,7 @@ if __name__ == "__main__":
     except Exception:
         run = None
         if config.local_rank == 0:
-#             run = init_neptune(Config, log_folder)
+            run = init_neptune(Config, log_folder)
 
             if args.fold > -1:
                 config.selected_folds = [args.fold]
@@ -301,6 +417,8 @@ if __name__ == "__main__":
                 create_logger(directory=log_folder, name="logs.txt")
 
             save_config(config, log_folder + "config.json")
+            if run is not None:
+                run["global/config"].upload(log_folder + "config.json")
 
     if config.local_rank == 0:
         print("Device :", torch.cuda.get_device_name(0), "\n")

@@ -40,11 +40,14 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         transforms=get_transfos(strength=config.aug_strength),
         use_soft_mask=config.use_soft_mask,
         use_shape_descript=config.use_shape_descript,
+        use_pl_masks=config.use_pl_masks,
+        frames=config.frames,
     )
 
     val_dataset = ContrailDataset(
         df_val,
         transforms=get_transfos(augment=False),
+        frames=config.frames,
     )
 
     if config.pretrained_weights is not None:
@@ -70,6 +73,12 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         use_hypercolumns=config.use_hypercolumns,
         center=config.center,
         use_cls=config.loss_config['aux_loss_weight'] > 0,
+        frames=config.frames,
+        use_lstm=config.use_lstm,
+        bidirectional=config.bidirectional,
+        use_cnn=config.use_cnn,
+        kernel_size=config.kernel_size,
+        use_transfo=config.use_transfo,
         verbose=(config.local_rank == 0),
     ).cuda()
 

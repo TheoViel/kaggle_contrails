@@ -258,6 +258,7 @@ class Unet(SegmentationModel):
         aux_params: Optional[dict] = None,
         use_pixel_shuffle=False,
         use_hypercolumns=False,
+        use_lstm=False,
         center="none",
     ):
         super().__init__()
@@ -307,8 +308,10 @@ class Unet(SegmentationModel):
         else:
             decoder_out_channels =  decoder_channels[-1]
 
+        self.decoder_out_channels = decoder_out_channels
+
         self.segmentation_head = SegmentationHead(
-            in_channels=decoder_out_channels,
+            in_channels=decoder_out_channels,  #  * (1 + use_lstm),
             out_channels=classes,
             activation=activation,
             kernel_size=3,
