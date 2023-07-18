@@ -13,8 +13,7 @@ from model_zoo.models import define_model
 from data.dataset import ContrailDataset
 from data.transforms import get_transfos
 
-from util.torch import seed_everything, count_parameters, save_model_weights, load_model_weights
-from util.metrics import dice_score
+from util.torch import seed_everything, count_parameters, save_model_weights
 
 
 def train(config, df_train, df_val, fold, log_folder=None, run=None):
@@ -30,9 +29,8 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         run (neptune.Run): Nepture run. Defaults to None.
 
     Returns:
-        np array [len(df_val) x num_classes]: Validation predictions.
+        dict: Dice scores at different thresholds.
     """
-          
     df_train_ = df_train[df_train['has_contrail']] if config.two_stage else df_train
 
     train_dataset = ContrailDataset(
@@ -116,7 +114,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         run=run,
         fold=fold,
     )
-    
+
     if config.two_stage:
         # Update params & data
         config.epochs = 10
@@ -129,7 +127,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
             df_train,
             transforms=get_transfos(strength=config.aug_strength),
         )
-        
+
         if config.local_rank == 0:
             print(f"\n    -> {len(train_dataset)} 2nd stage training images\n")
 
@@ -177,6 +175,9 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
         df_extra (pandas dataframe or None, optional): Extra metadata. Defaults to None.
         log_folder (None or str, optional): Folder to logs results to. Defaults to None.
         run (None or Nepture run): Nepture run. Defaults to None.
+
+    Returns:
+        dict: Dice scores at different thresholds.
     """
     if "fold" not in df.columns:
         folds = pd.read_csv(config.folds_file)
@@ -208,9 +209,9 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
     if config.local_rank == 0:
         dices = {th: np.mean([dice[th] for dice in scores]) for th in scores[0].keys()}
         th, dice = max(dices.items(), key=operator.itemgetter(1))
-        
+
         print(f"\n\n -> CV Dice : {dice:.3f}  -  th : {th:.2f}")
-    
+
         if log_folder is not None:
             json.dump(dices, open(log_folder + "dices.json", "w"))
 
@@ -239,5 +240,5 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
     if run is not None:
         print()
         run.stop()
-        
+
     return dices

@@ -56,9 +56,8 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0):
         albumentation transforms: Transforms for image augmentation.
     """
     resize_aug = []
-    
-#         albu.Resize(resize[0], resize[1])
-#     ] if resize else []
+    #     albu.Resize(resize[0], resize[1])
+    # ] if resize else []
 
     normalizer = albu.Compose(
         resize_aug
@@ -79,8 +78,6 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0):
             ]
         elif strength == 2:
             augs = [
-#                 albu.HorizontalFlip(p=0.5),
-#                 albu.VerticalFlip(p=0.5),
                 albu.ShiftScaleRotate(
                     scale_limit=0.2,
                     shift_limit=0.2,
@@ -92,8 +89,6 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0):
             ]
         elif strength == 3:
             augs = [
-#                 albu.HorizontalFlip(p=0.5),
-#                 albu.VerticalFlip(p=0.5),
                 albu.ShiftScaleRotate(
                     scale_limit=0.2,
                     shift_limit=0.2,

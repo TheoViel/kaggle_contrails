@@ -9,7 +9,7 @@ import pandas as pd
 from data.preparation import prepare_data
 from util.torch import init_distributed
 from util.logger import create_logger, save_config, prepare_log_folder, init_neptune, get_last_log_folder
-from util.gpu_affinity import set_affinity
+# from util.gpu_affinity import set_affinity
 
 from params import DATA_PATH
 
@@ -89,10 +89,10 @@ class Config:
     # k-fold
     k = 4
     folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0] #, 1, 2, 3]
+    selected_folds = [0]  # , 1, 2, 3]
 
     # Model
-    encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
+    encoder_name = "convnextv2_nano"
     decoder_name = "Unet"
 
     use_lstm = False
@@ -182,7 +182,7 @@ class Config2:
     selected_folds = [0]  # 1, 2, 3]  # [0]
 
     # Model
-    encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
+    encoder_name = "convnextv2_nano"
     decoder_name = "Unet"
     reduce_stride = 2
 
@@ -193,7 +193,7 @@ class Config2:
     use_transfo = False
 
     pretrained_weights = None
-    
+
     use_pixel_shuffle = False
     use_hypercolumns = False
     center = "none"
@@ -227,7 +227,7 @@ class Config2:
         "name": "AdamW",
         "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
         "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
-        "warmup_prop": 0.  if pretrained_weights is None else 0.1,
+        "warmup_prop": 0. if pretrained_weights is None else 0.1,
         "betas": (0.9, 0.999),
         "max_grad_norm": 1.0,
         "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
@@ -326,10 +326,9 @@ if __name__ == "__main__":
     from training.main import k_fold
 #     df = df.head(1000)
     k_fold(config, df, log_folder=log_folder, run=run)
-    
-    
-    ## Stage 2
-    
+
+    # -------- Stage 2 -------- #
+
     # Update Config
     config2 = Config2
     config2.pretrained_weights = log_folder
@@ -340,18 +339,18 @@ if __name__ == "__main__":
     config2.device = config.device
     config2.distributed = config.distributed
     config = config2
-    
+
     # Logging
     if config.local_rank == 0:
         log_folder = prepare_log_folder(LOG_PATH)
         print(f'\n -> Logging results to {log_folder}\n')
-            
+
         print(f"\n- Frames  : {config.frames}")
         print(f"- LSTM    : {config.use_lstm}")
         print(f"- CNN     : {config.use_cnn}")
         print(f"- Transfo : {config.use_transfo}")
         print("\n -> 2.5D Fine-tuning\n")
-        
+
         print(config.pretrained_weights)
 
         run = init_neptune(config, log_folder)
@@ -359,11 +358,11 @@ if __name__ == "__main__":
 
         save_config(config, log_folder + "config.json")
         run["global/config"].upload(log_folder + "config.json")
-            
+
     # Train
     df = prepare_data(DATA_PATH, config.processed_folder, use_raw=config.use_raw)
-    
+
     k_fold(config, df, log_folder=log_folder, run=run)
-            
+
     if config.local_rank == 0:
         print("\nDone !")

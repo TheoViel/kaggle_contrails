@@ -5,17 +5,16 @@ import matplotlib.pyplot as plt
 
 def plot_contours(img, mask=None, preds=None, w=1):
     """
-    Plots the contours of mask predictions (in green) and of a mask (in red).
+    Plot contours on the input image.
 
     Args:
-        img (numpy array [H x W x C]): Image.
-        preds (numpy int array [H x W] or None): Predicted mask.
-        mask (numpy array [H x W] or None): Mask.
-        w (int, optional): Contour width. Defaults to 1.
-        downsize (int, optional): Downsizing factor. Defaults to 1.
+        img (numpy array): The input image as a NumPy array.
+        mask (numpy array, optional): The mask to plot the contours for. Defaults to None.
+        preds (numpy array, optional): The predictions to plot the contours for. Defaults to None.
+        w (int, optional): Width of the contour lines. Defaults to 1.
 
     Returns:
-        px.imshow: Ploty plot.
+        None: This function only displays the image with the plotted contours.
     """
     contours, contours_preds = None, None
     img = img.copy()
@@ -33,28 +32,47 @@ def plot_contours(img, mask=None, preds=None, w=1):
             preds = (preds / 255).astype(float)
         preds = (preds * 255).astype(np.uint8)
         contours_preds, _ = cv2.findContours(preds, cv2.RETR_LIST, cv2.CHAIN_APPROX_NONE)
-        
+
     if contours_preds is not None:
         cv2.polylines(img, contours_preds, True, (0.0, 1.0, 0.0), w)
     if contours is not None:
         cv2.polylines(img, contours, True, (1.0, 0.0, 0.0), w)
-        
-#  img = (img + img_gt) / 2
 
     plt.imshow(img)
     plt.axis(False)
-    
-    
+
+
 def plot_mask(img, mask):
+    """
+    Plot the mask overlay on the input image.
+
+    Args:
+        img (numpy array): The input image as a NumPy array.
+        mask (numpy array): The mask to overlay on the image.
+
+    Returns:
+        None: This function only displays the image with the mask overlay.
+    """
     mask = mask.copy()
     mask = np.where(mask, mask, img)
 
     plt.imshow(img)
     plt.imshow(mask, cmap='Reds', alpha=.4, interpolation='none')
     plt.axis(False)
-    
-    
+
+
 def plot_sample(img, mask, figsize=(18, 6)):
+    """
+    Plot a sample with the original image, the mask, and the contours.
+
+    Args:
+        img (numpy array): The original image as a NumPy array.
+        mask (numpy array): The mask to plot.
+        figsize (tuple, optional): Figure size for the subplots. Defaults to (18, 6).
+
+    Returns:
+        None: This function only displays the sample with the image, mask, and contours.
+    """
     plt.figure(figsize=figsize)
 
     plt.subplot(1, 3, 1)

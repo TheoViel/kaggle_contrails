@@ -1,6 +1,3 @@
-import numpy as np
-
-
 def dice_score(preds, truths, eps=1e-8):
     """
     Dice metric.

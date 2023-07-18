@@ -1,3 +1,5 @@
+# TODO : DOC
+
 import torch
 import torch.nn as nn
 import segmentation_models_pytorch
@@ -33,7 +35,7 @@ def define_model(
     use_cls=False,
     frames=4,
     use_lstm=False,
-    bidirectional = False,
+    bidirectional=False,
     use_cnn=False,
     kernel_size=5,
     use_transfo=False,
@@ -71,8 +73,8 @@ def define_model(
         from mmcv.utils import Config
         import sys
         sys.path.append('../nextvit/segmentation/')
-        from nextvit import nextvit_small
-        
+        # from nextvit import nextvit_small
+
         cfg = Config.fromfile(f"../nextvit/segmentation/configs/fpn_512_{encoder_name}_80k.py")
         model = build_segmentor(cfg.model)
         if pretrained:
@@ -82,7 +84,7 @@ def define_model(
         model.backbone.stem[0].conv.stride = (1, 1)
         model.backbone.stem[3].conv.stride = (1, 1)
         model = nn.Sequential(model.backbone, model.neck, model.decode_head)
-        
+
     else:
         decoder = getattr(segmentation_models_pytorch, decoder_name)
         model = decoder(
@@ -95,7 +97,7 @@ def define_model(
         )
 
     model.num_classes = num_classes
-        
+
     model = SegWrapper(
         model,
         use_cls,
@@ -107,7 +109,7 @@ def define_model(
         use_transfo=use_transfo,
     )
     model.reduce_stride(encoder_name, decoder_name, reduce_stride)
-    
+
     if pretrained_weights is not None:
         if verbose:
             print(f'\n-> Loading weights from "{pretrained_weights}"\n')
@@ -116,10 +118,7 @@ def define_model(
             state_dict['model.segmentation_head.0.weight'],
             state_dict['model.segmentation_head.0.bias'],
         )
-        
-        errors = model.load_state_dict(state_dict, strict=False)
-#         print(errors)
-#         raise NotImplementedError
+        model.load_state_dict(state_dict, strict=False)
 
     return model
 
@@ -155,13 +154,13 @@ class SegWrapper(nn.Module):
         self.use_cnn = use_cnn
         self.use_transfo = use_transfo
         self.frames = frames
-        
+
         if use_lstm or use_cnn:
             assert isinstance(frames, (tuple, list)), "frames must be tuple or int"
             assert (len(frames) > 1) and (4 in frames), "several frames expected, 4 has to be included"
         if use_transfo:
             assert not use_lstm and not use_cnn, "Cannot use transformer and lstm/cnn"
-        
+
         if self.use_lstm:
             self.lstm = nn.LSTM(
                 model.encoder.out_channels[-1],
@@ -183,7 +182,7 @@ class SegWrapper(nn.Module):
                 nn.BatchNorm3d(model.encoder.out_channels[-1]),
                 nn.ReLU(),
             )
-            
+
         if self.use_transfo:
             self.transfo = Tmixer(model.encoder.out_channels[-1],)
 
@@ -244,14 +243,14 @@ class SegWrapper(nn.Module):
             n_frames = 1
 
         features = self.model.encoder(x)
-        
+
         if self.use_lstm or self.use_cnn or self.use_transfo:
             assert n_frames > 1, "Only one frame, cannot use LSTM / CNN"
             features_ = []
             frame_idx = self.frames.index(4)
-    
+
             for i, ft in enumerate(features):
-#                 print(ft.size())
+                # print(ft.size())
 
                 if i != len(features) - 1:  # not last layer
                     ft = ft.view(bs, n_frames, ft.size(1), ft.size(2), ft.size(3))[:, frame_idx]
@@ -260,7 +259,7 @@ class SegWrapper(nn.Module):
 
                 _, n_fts, h, w = ft.size()
                 ft = ft.view(bs, n_frames, n_fts, h, w)
-                
+
                 if self.use_transfo:
                     ft = self.transfo(ft, frame_idx=frame_idx)
 
@@ -274,9 +273,8 @@ class SegWrapper(nn.Module):
 
                     ft = self.lstm(ft)[0][:, frame_idx]  # bs x h x w x n_fts
 
-                    ft = ft.view(bs, h, w, n_fts).permute(0, 3, 1, 2) # bs x n_fts x h x w
+                    ft = ft.view(bs, h, w, n_fts).permute(0, 3, 1, 2)  # bs x n_fts x h x w
 
-                    
                 features_.append(ft.view(bs, n_fts, h, w))
 
             features = features_
@@ -291,4 +289,3 @@ class SegWrapper(nn.Module):
             labels = torch.zeros(bs, 1).to(x.device)
 
         return masks, labels
-    

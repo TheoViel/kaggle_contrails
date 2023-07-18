@@ -1,3 +1,7 @@
+# Adapted from:
+# https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/decoders/unet/decoder.py
+# TODO : Clean, update doc
+
 import timm
 import torch
 import numpy as np
@@ -49,7 +53,7 @@ class DecoderBlock(nn.Module):
             use_batchnorm=use_batchnorm,
         )
         self.attention2 = md.Attention(attention_type, in_channels=out_channels)
-        
+
         if self.use_pixel_shuffle:
             self.pixel_shuffle = PixelShuffle_ICNR(in_channels, scale=2)
 
@@ -100,7 +104,7 @@ class UnetDecoder(nn.Module):
         use_hypercolumns=False,
     ):
         super().__init__()
-        
+
         self.use_hypercolumns = use_hypercolumns
 
         if n_blocks != len(decoder_channels):
@@ -129,13 +133,15 @@ class UnetDecoder(nn.Module):
             self.center = nn.Identity()
 
         # combine decoder keyword arguments
-        kwargs = dict(use_batchnorm=use_batchnorm, attention_type=attention_type, use_pixel_shuffle=use_pixel_shuffle)
+        kwargs = dict(
+            use_batchnorm=use_batchnorm, attention_type=attention_type, use_pixel_shuffle=use_pixel_shuffle
+        )
         blocks = [
             DecoderBlock(in_ch, skip_ch, out_ch, **kwargs)
             for in_ch, skip_ch, out_ch in zip(in_channels, skip_channels, out_channels)
         ]
         self.blocks = nn.ModuleList(blocks)
-        
+
         if use_hypercolumns:
             hc_conv_size = np.sum(decoder_channels[-4:])
             self.hypercolumns_conv = nn.Sequential(
@@ -146,12 +152,11 @@ class UnetDecoder(nn.Module):
                 nn.ReLU(),
                 nn.BatchNorm2d(hc_conv_size),
             )
-                
 
     def forward(self, *features):
         features = features[1:]  # remove first skip with same spatial resolution
         features = features[::-1]  # reverse channels to start from head of encoder
-        
+
 #         for ft in features:
 #             print(ft.size())
 #         print()
@@ -164,12 +169,12 @@ class UnetDecoder(nn.Module):
         xs = []
         for i, decoder_block in enumerate(self.blocks):
             skip = skips[i] if i < len(skips) else None
-            
+
 #             print(i, x.size(), skip.size() if skip is not None else None)
             x = decoder_block(x, skip)
             xs.append(x)
 #             print(x.size())
-            
+
 #         print(len(xs))
         if self.use_hypercolumns:
             h, w = x.size()[2:]
@@ -179,7 +184,7 @@ class UnetDecoder(nn.Module):
                 F.upsample_bilinear(xs[-2], size=(h, w)),
                 x
             ], 1)
-            
+
             x = self.hypercolumns_conv(x)
 #             print(x.size())
 
@@ -189,22 +194,22 @@ class UnetDecoder(nn.Module):
 def convnext_forward_features(self, x):
     fts = [x]
     x = self.stem(x)
-    
+
     if (x.size(-1) % 8) != 0:
         x = F.pad(x, [0, 1, 0, 1], value=0.0)
 
     for stage in self.stages:
         x = stage(x)
         fts.append(x)
-    
+
     return fts
 
 
 class Unet(SegmentationModel):
     """Unet_ is a fully convolution neural network for image semantic segmentation. Consist of *encoder*
     and *decoder* parts connected with *skip connections*. Encoder extract features of different spatial
-    resolution (skip connections) which are used by decoder to define accurate segmentation mask. Use *concatenation*
-    for fusing decoder blocks with skip connections.
+    resolution (skip connections) which are used by decoder to define accurate segmentation mask.
+    Use *concatenation* for fusing decoder blocks with skip connections.
 
     Args:
         encoder_name: Name of the classification model that will be used as an encoder (a.k.a backbone)
@@ -213,9 +218,9 @@ class Unet(SegmentationModel):
             two times smaller in spatial dimensions than previous one (e.g. for depth 0 we will have features
             with shapes [(N, C, H, W),], for depth 1 - [(N, C, H, W), (N, C, H // 2, W // 2)] and so on).
             Default is 5
-        encoder_weights: One of **None** (random initialization), **"imagenet"** (pre-training on ImageNet) and
-            other pretrained weights (see table with available weights for each encoder_name)
-        decoder_channels: List of integers which specify **in_channels** parameter for convolutions used in decoder.
+        encoder_weights: One of **None** (random initialization), **"imagenet"** (pre-training on ImageNet)
+            and other pretrained weights (see table with available weights for each encoder_name)
+        decoder_channels: List of integers which specify **in_channels** parameter for decoder convolutions.
             Length of the list should be the same as **encoder_depth**
         decoder_use_batchnorm: If **True**, BatchNorm2d layer between Conv2D and Activation layers
             is used. If **"inplace"** InplaceABN will be used, allows to decrease memory consumption.
@@ -228,8 +233,9 @@ class Unet(SegmentationModel):
             Available options are **"sigmoid"**, **"softmax"**, **"logsoftmax"**, **"tanh"**, **"identity"**,
                 **callable** and **None**.
             Default is **None**
-        aux_params: Dictionary with parameters of the auxiliary output (classification head). Auxiliary output is build
-            on top of encoder if **aux_params** is not **None** (default). Supported params:
+        aux_params: Dictionary with parameters of the auxiliary output (classification head).
+            Auxiliary output is build on top of encoder if **aux_params** is not **None** (default).
+            Supported params:
                 - classes (int): A number of classes
                 - pooling (str): One of "max", "avg". Default is "avg"
                 - dropout (float): Dropout factor in [0, 1)
@@ -306,19 +312,21 @@ class Unet(SegmentationModel):
         if use_hypercolumns:
             decoder_out_channels = np.sum(decoder_channels[-4:])
         else:
-            decoder_out_channels =  decoder_channels[-1]
+            decoder_out_channels = decoder_channels[-1]
 
         self.decoder_out_channels = decoder_out_channels
 
         self.segmentation_head = SegmentationHead(
-            in_channels=decoder_out_channels,  #  * (1 + use_lstm),
+            in_channels=decoder_out_channels,  # * (1 + use_lstm),
             out_channels=classes,
             activation=activation,
             kernel_size=3,
         )
 
         if aux_params is not None:
-            self.classification_head = ClassificationHead(in_channels=self.encoder.out_channels[-1], **aux_params)
+            self.classification_head = ClassificationHead(
+                in_channels=self.encoder.out_channels[-1], **aux_params
+            )
         else:
             self.classification_head = None
 

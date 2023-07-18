@@ -129,11 +129,13 @@ class Lookahead(Optimizer):
 def define_optimizer(model, name, lr=1e-3, lr_encoder=1e-3, weight_decay=0, betas=(0.9, 0.999)):
     """
     Defines an optimizer for the given model based on the specified name.
+    Supports discriminative lr between the encoder and other layers.
 
     Args:
         model (torch.nn.Module): The model for which to define the optimizer.
         name (str): The name of the optimizer.
         lr (float, optional): The learning rate. Defaults to 1e-3.
+        lr_encoder (float, optional): The learning rate for encoder layers. Defaults to 1e-3.
         weight_decay (float, optional): The weight decay. Defaults to 0.
         betas (tuple, optional): Optimizer betas. Defaults to (0.9, 0.999).
 

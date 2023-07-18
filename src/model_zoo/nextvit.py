@@ -1,4 +1,6 @@
+# Adapted from https://github.com/bytedance/Next-ViT/tree/main
 # Copyright (c) ByteDance Inc. All rights reserved.
+
 import torch
 import torch.utils.checkpoint as checkpoint
 
@@ -15,7 +17,6 @@ WEIGHTS = {
     "nextvit_base": "../input/nextvit_base_in1k6m_384.pth",
     "nextvit_large": "../input/nextvit_large_in1k6m_384.pth",
 }
-
 
 
 class ConvBNReLU(nn.Module):
@@ -595,7 +596,7 @@ def nextvit_small(pretrained=False, pretrained_cfg=None, **kwargs):
     model.output_stride = 16
 
     if pretrained:
-        model.load_state_dict(torch.load(WEIGHTS["nextvit_small"])["model"], strict=False)  
+        model.load_state_dict(torch.load(WEIGHTS["nextvit_small"])["model"], strict=False)
     return model
 
 
@@ -611,7 +612,7 @@ def nextvit_base(pretrained=False, pretrained_cfg=None, **kwargs):
 
     if pretrained:
         model.load_state_dict(torch.load(WEIGHTS["nextvit_base"])["model"], strict=False)
-            
+
     return model
 
 

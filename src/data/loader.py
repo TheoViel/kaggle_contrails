@@ -93,6 +93,7 @@ def define_loaders(
         distributed (bool): Whether to use distributed training. Default to False.
         world_size (int): The total number of processes for distributed training. Default to 0.
         local_rank (int): The rank of the current process. Default to 0.
+        num_workers (int): Number of workers to use for the dataloaders. Default to 0.
 
     Returns:
         tuple: A tuple containing the training data loader and the validation data loader.

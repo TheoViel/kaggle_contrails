@@ -91,11 +91,20 @@ def prepare_log_folder(log_path):
 
 
 def get_last_log_folder(log_path):
+    """
+    Get the path to the most recent log folder from today or the previous day.
+
+    Args:
+        log_path (str): The base path to the log folders.
+
+    Returns:
+        str: The path to the most recent log folder.
+    """
     today = str(datetime.date.today())
     log_today = f"{log_path}{today}/"
-    
+
     if not os.path.exists(log_today):
-        today = today - timedelta(days=1)
+        today = today - datetime.timedelta(days=1)
         log_today = f"{log_path}{today}/"
 
     exps = []
@@ -108,7 +117,6 @@ def get_last_log_folder(log_path):
 
     log_folder = log_today + f"{exp_id}/"
     return log_folder
-
 
 
 def save_config(config, path):
@@ -144,14 +152,7 @@ def init_neptune(config, log_folder):
         Neptune run: Run.
     """
     print()
-    run = neptune.init_run(
-        project=NEPTUNE_PROJECT,
-#         capture_hardware_metrics=False,
-#         capture_stdout=False,
-#         capture_stderr=False,
-#         flush_period=600,
-#         mode="sync",
-    )
+    run = neptune.init_run(project=NEPTUNE_PROJECT)
 
     run["global/log_folder"] = log_folder
 

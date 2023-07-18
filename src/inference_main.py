@@ -22,23 +22,24 @@ class Config:
 
 def predict_multi(models, dataset, loss_config, batch_size=64, device="cuda", use_fp16=False, num_workers=8):
     """
-    Perform model inference on a dataset.
+    Perform multi-model inference and generate predictions for the given dataset.
 
     Args:
-        model (nn.Module): Trained model for inference.
-        dataset (Dataset): Dataset to perform inference on.
-        loss_config (dict): Loss configuration.
-        batch_size (int, optional): Batch size for inference. Defaults to 64.
-        device (str, optional): Device to use for inference. Defaults to "cuda".
-        use_fp16 (bool, optional): Whether to use mixed precision inference. Defaults to False.
+        models (list of torch.nn.Module): List of trained models for inference.
+        dataset (torch.utils.data.Dataset): Dataset for which to generate predictions.
+        loss_config (dict): Configuration for loss function and activation.
+        batch_size (int, optional): Batch size for prediction. Defaults to 64.
+        device (str, optional): Device for inference, 'cuda' or 'cpu'. Defaults to 'cuda'.
+        use_fp16 (bool, optional): Whether to use mixed-precision (FP16) inference. Defaults to False.
+        num_workers (int, optional): Number of worker threads for data loading. Defaults to 8.
 
     Returns:
-        preds (numpy.ndarray): Predicted probabilities of shape (num_samples, num_classes).
-        preds_aux (numpy.ndarray): Auxiliary predictions of shape (num_samples, num_aux_classes).
+        np array [N x C]: Predicted probabilities for each class for each sample.
+        list: Empty list, placeholder for the auxiliary task.
     """
     for model in models:
         model.eval()
-    preds, preds_aux = [], []
+    preds = []
 
     loader = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
@@ -67,22 +68,23 @@ def predict_multi(models, dataset, loss_config, batch_size=64, device="cuda", us
 
 def predict(model, dataset, loss_config, batch_size=64, device="cuda", use_fp16=False, num_workers=8):
     """
-    Perform model inference on a dataset.
+    Perform inference using a single model and generate predictions for the given dataset.
 
     Args:
-        model (nn.Module): Trained model for inference.
-        dataset (Dataset): Dataset to perform inference on.
-        loss_config (dict): Loss configuration.
-        batch_size (int, optional): Batch size for inference. Defaults to 64.
-        device (str, optional): Device to use for inference. Defaults to "cuda".
-        use_fp16 (bool, optional): Whether to use mixed precision inference. Defaults to False.
+        model (torch.nn.Module): Trained model for inference.
+        dataset (torch.utils.data.Dataset): Dataset for which to generate predictions.
+        loss_config (dict): Configuration for loss function and activation.
+        batch_size (int, optional): Batch size for prediction. Defaults to 64.
+        device (str, optional): Device for inference, 'cuda' or 'cpu'. Defaults to 'cuda'.
+        use_fp16 (bool, optional): Whether to use mixed-precision (FP16) inference. Defaults to False.
+        num_workers (int, optional): Number of worker threads for data loading. Defaults to 8.
 
     Returns:
-        preds (numpy.ndarray): Predicted probabilities of shape (num_samples, num_classes).
-        preds_aux (numpy.ndarray): Auxiliary predictions of shape (num_samples, num_aux_classes).
+        np array [N x C]: Predicted probabilities for each class for each sample.
+        list: Empty list, placeholder for the auxiliary task.
     """
     model.eval()
-    preds, preds_aux = [], []
+    preds = []
 
     loader = DataLoader(
         dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers
@@ -101,15 +103,9 @@ def predict(model, dataset, loss_config, batch_size=64, device="cuda", use_fp16=
             elif loss_config["activation"] == "softmax":
                 pred = pred.softmax(-1)
 
-#             if loss_config.get("activation_aux", "softmax") == "sigmoid":
-#                 pred_aux = pred_aux.sigmoid()
-#             elif loss_config.get("activation_aux", "softmax") == "softmax":
-#                 pred_aux = pred_aux.softmax(-1)
-
             preds.append(pred.detach().cpu().numpy())
-#             preds_aux.append(pred_aux.cpu().numpy())
 
-    return np.concatenate(preds), []  #np.concatenate(preds_aux)
+    return np.concatenate(preds), []
 
 
 def kfold_inference(
@@ -129,9 +125,12 @@ def kfold_inference(
         exp_folder (str): Path to the experiment folder.
         debug (bool, optional): Whether to run in debug mode. Defaults to False.
         use_fp16 (bool, optional): Whether to use mixed precision inference. Defaults to False.
+        save (bool, optional): Whether to save the predictions. Defaults to False.
+        num_workers (int, optional): Number of worker threads for data loading. Defaults to 8.
+        batch_size (int, optional): Batch size. If None, uses the value in the config. Defaults to None.
 
     Returns:
-        np.ndarray: Array containing the predicted probabilities for each class.
+        List[np.ndarray]: List of arrays containing the predicted probabilities for each class for each fold.
     """
     config = Config(json.load(open(exp_folder + "config.json", "r")))
 
@@ -162,11 +161,6 @@ def kfold_inference(
         model = load_model_weights(model, weights, verbose=1)
 
         df_val = df[df['fold'] == fold].reset_index(drop=True) if "fold" in df.columns else df
-        
-        try:
-            _ = config.frames
-        except:
-            config.frames = 4
 
         dataset = ContrailDataset(
             df_val,
@@ -182,7 +176,7 @@ def kfold_inference(
             use_fp16=use_fp16,
             num_workers=num_workers,
         )
-        
+
         if save:
             np.save(exp_folder + f"pred_val_{fold}.npy", pred)
 

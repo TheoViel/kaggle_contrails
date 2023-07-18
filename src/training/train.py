@@ -40,10 +40,9 @@ def evaluate(
 
     Returns:
         val_loss (float or int): Average validation loss.
-        dice (float or int): Dice score.
+        dices (float or int): Dice scores.
         acc (float or int): Accuracy score.
     """
-
     model.eval()
     val_losses = []
 
@@ -78,13 +77,13 @@ def evaluate(
         val_losses = sync_across_gpus(val_losses, world_size)
         accs = sync_across_gpus(accs, world_size)
         torch.distributed.barrier()
-    
+
     dices = {}
-    
+
     for th in meter.thresholds:
         unions = meter.unions[th]
         intersections = meter.intersections[th]
-        
+
         if distributed:
             unions = sync_across_gpus(unions, world_size)
             intersections = sync_across_gpus(intersections, world_size)
@@ -263,7 +262,7 @@ def fit(
                     dt = time.time() - start_time
                     lr = scheduler.get_last_lr()[0]
                     step_ = step * world_size
-                    
+
                     th, dice = max(dices.items(), key=operator.itemgetter(1))
 
                     s = f"Epoch {epoch:02d}/{epochs:02d} (step {step_:04d}) \t"

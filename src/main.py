@@ -9,11 +9,11 @@ import pandas as pd
 from data.preparation import prepare_data
 from util.torch import init_distributed
 from util.logger import create_logger, save_config, prepare_log_folder, init_neptune
-from util.gpu_affinity import set_affinity
+# from util.gpu_affinity import set_affinity
 
 from params import DATA_PATH
 
-    
+
 WEIGHTS = {
     "tf_efficientnetv2_s":
     {
@@ -113,7 +113,7 @@ def parse_args():
 #     use_cnn = False
 #     kernel_size = (1 if use_lstm else len(frames), 3, 3)
 #     use_transfo = False
-    
+
 #     pretrained_weights = None
 #     reduce_stride = 1
 #     use_pixel_shuffle = False
@@ -295,7 +295,7 @@ class Config:
     use_transfo = True
 
     pretrained_weights = WEIGHTS[encoder_name][reduce_stride]  # None
-    
+
     use_pixel_shuffle = False
     use_hypercolumns = False
     center = "none"
@@ -329,7 +329,7 @@ class Config:
         "name": "AdamW",
         "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
         "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
-        "warmup_prop": 0.  if pretrained_weights is None else 0.1,
+        "warmup_prop": 0. if pretrained_weights is None else 0.1,
         "betas": (0.9, 0.999),
         "max_grad_norm": 1.0,
         "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
@@ -354,11 +354,11 @@ if __name__ == "__main__":
     config = Config
     init_distributed(config)
 
-     # ['socket', 'single', 'single_unique', 'socket_unique_interleaved', 'socket_unique_continuous', 'disabled']
-#     affinity = set_affinity(
-#         config.local_rank, torch.cuda.device_count(), "socket_unique_interleaved" 
-#     )
-#     print(f'{config.local_rank}: thread affinity: {sorted(list(affinity))}')
+    #  ['socket', 'single', 'single_unique', 'socket_unique_interleaved', 'socket_unique_continuous', 'disabled']
+    # affinity = set_affinity(
+    #     config.local_rank, torch.cuda.device_count(), "socket_unique_interleaved"
+    # )
+    # print(f'{config.local_rank}: thread affinity: {sorted(list(affinity))}')
 
     if config.local_rank == 0:
         print("\nStarting !")

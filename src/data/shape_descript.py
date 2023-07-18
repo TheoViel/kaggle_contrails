@@ -1,4 +1,5 @@
-import time
+# SOURCE : https://github.com/funkelab/lsd/tree/b6aee2fd0c87bc70a52ea77e85f24cc48bc4f437
+
 import numpy as np
 import gunpowder as gp
 
@@ -23,6 +24,20 @@ def get_shape_descript(
 
 class ShapeDescript(object):
     def __init__(self, sigma, mode="gaussian", downsample=1):
+        """
+        Create an extractor for local shape descriptors.
+        The extractor caches the data repeatedly needed for segmentations of the same size.
+        If this is not desired, `func:get_local_shape_descriptors` should be used instead.
+
+        Args:
+            sigma (``tuple`` of ``float``): The radius to consider for the local shape descriptor.
+            mode (``string``, optional): Either ``gaussian`` or ``sphere``. Determines over what region the
+                local shape descriptor is computed. For ``gaussian``, aGaussian with the given ``sigma`` is
+                used, and statistics are averaged with corresponding weights. For ``sphere``, a sphere
+                with radius ``sigma`` is used. Defaults to 'gaussian'.
+            downsample (``int``, optional): Compute the local shape descriptor on a downsampled volume for
+                faster processing. Defaults to 1 (no downsampling).
+        """
         self.sigma = sigma
         self.mode = mode
         self.downsample = downsample
@@ -31,6 +46,21 @@ class ShapeDescript(object):
     def get_descriptors(
         self, segmentation, components=None, voxel_size=None, roi=None, labels=None
     ):
+        """
+        Compute local shape descriptors for a given segmentation.
+
+        Args:
+            segmentation (``np.array`` of ``int``):A label array to compute the local shape descriptors for.
+            components (``string`` of ``int``, optional): The components of the local shape descriptors to
+                compute and return."012" returns the first three components. "0129" returns the first three
+                and last components if 3D, "0125" if 2D. Components must be in ascending order.
+                Defaults to all components.
+            voxel_size (``tuple`` of ``int``, optional):
+                The voxel size of ``segmentation``. Defaults to 1.
+            roi (``gunpowder.Roi``, optional): Restrict the computation to the given ROI in voxels.
+            labels (array-like of ``int``, optional): Restrict the computation to the given labels.
+            Defaults to all labels inside the ``roi`` of ``segmentation``.
+        """
         dims = len(segmentation.shape)
 
         if voxel_size is None:
@@ -99,7 +129,6 @@ class ShapeDescript(object):
         coords = self.coords[(sub_shape, sub_voxel_size)]
 
         # for all labels
-       
         for label in labels:
             if label == 0:
                 continue
@@ -111,19 +140,13 @@ class ShapeDescript(object):
                 sub_mask = mask[::df, ::df, ::df]
             except Exception:
                 sub_mask = mask[::df, ::df]
-                
-#             return descriptors
-        
+
             # SLOW - 70 ms
             sub_descriptor = np.concatenate(
                 self.__get_stats(coords, sub_mask, sub_sigma_voxel, sub_roi, components)
             )
 
-#             t0 = time.time()
             descriptor = self.__upsample(sub_descriptor, df)
-#             t1 = time.time()
-#             print(f'{(t1 - t0) * 1000 :.3f}ms - upsample')
-            
             descriptors += descriptor * mask[roi_slices]
 
         # normalize stats
@@ -211,19 +234,12 @@ class ShapeDescript(object):
         masked_coords = coords * mask
 
         # number of inside voxels
-        
-#         t0 = time.time()
         count = self.__aggregate(mask, sigma_voxel, self.mode, roi)
-
         count_len = len(count.shape)
-        
-#         t1 = time.time()
-
         # avoid division by zero
         count[count == 0] = 1
 
         # mean
-
         mean = np.array(
             [
                 self.__aggregate(masked_coords[d], sigma_voxel, self.mode, roi)
@@ -232,8 +248,6 @@ class ShapeDescript(object):
         )
 
         mean /= count
-        
-#         t2 = time.time()
 
         if components is not None:
             calc_mean_offset = True in [
@@ -247,8 +261,6 @@ class ShapeDescript(object):
             mean_offset = mean - coords[(slice(None),) + roi.to_slices()]
 
         # covariance
-#         t3 = time.time()
-
         if components is None or calc_covariance:
             coords_outer = self.__outer_product(masked_coords)
 
@@ -305,13 +317,6 @@ class ShapeDescript(object):
                 variance[0] /= self.sigma[0] ** 2
                 variance[1] /= self.sigma[1] ** 2
 
-#         t4 = time.time()
-        
-#         print(f'{(t4 - t3) * 1000 :.3f}ms - variance')
-#         print(f'{(t3 - t2) * 1000 :.3f}ms - mean_offset')
-#         print(f'{(t2 - t1) * 1000 :.3f}ms - mean')
-#         print(f'{(t1 - t0) * 1000 :.3f}ms - count')
-        
         if components is not None:
             ret = tuple()
 

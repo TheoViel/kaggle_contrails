@@ -10,20 +10,26 @@ from data.preparation import load_record, get_false_color_img
 
 class ContrailDataset(Dataset):
     """
-    Image torch Dataset.
-    TODO
+    Custom dataset for contrail data.
 
     Methods:
-        __init__(df, transforms): Constructor
-        __len__(): Get the length of the dataset
-        __getitem__(idx): Get an item from the dataset
+        __init__(df, transforms, use_soft_mask, use_shape_descript, use_pl_masks, frames):
+            Constructor for the dataset.
+        __len__(): Get the length of the dataset.
+        __getitem__(idx): Get an item from the dataset.
 
     Attributes:
-        df (pandas DataFrame): Metadata
-        img_paths (numpy array): Paths to the images
-        mask_paths (numpy array): Paths to the masks
-        transforms (albumentation transforms): Transforms to apply
-        targets (numpy array): Target labels
+        df (pandas DataFrame): Metadata containing information about the dataset.
+        transforms (albumentation transforms): Transforms to apply to the images and masks.
+        use_soft_mask (bool): Flag indicating whether to use the soft mask or not.
+        use_shape_descript (bool): Flag indicating whether to use shape descriptors.
+        use_pl_masks (bool): Flag indicating whether to use pseudo-label masks.
+        frames (int or list): Frame(s) to use for the false-color image.
+        img_paths (numpy array): Array of paths to the images.
+        mask_paths (numpy array): Array of paths to the masks.
+        folders (numpy array): Array of folder paths for the images.
+        ids (numpy array): Array of record IDs for the images.
+        targets (numpy array): Array of target labels indicating the presence of contrails.
     """
 
     def __init__(
@@ -39,8 +45,12 @@ class ContrailDataset(Dataset):
         Constructor.
 
         Args:
-            df (pandas DataFrame): Metadata.
-            transforms (albumentation transforms, optional): Transforms to apply. Defaults to None.
+            df (pandas DataFrame): Metadata containing information about the dataset.
+            transforms (albumentation transforms, optional): Transforms to apply to the images and masks. Defaults to None.
+            use_soft_mask (bool, optional): Flag indicating whether to use the soft mask or not. Defaults to False.
+            use_shape_descript (bool, optional): Flag indicating whether to use shape descriptors. Defaults to False.
+            use_pl_masks (bool, optional): Flag indicating whether to use pseudo-label masks. Defaults to False.
+            frames (int or list, optional): Frame(s) to use for the false-color image. Defaults to 4.
         """
         self.df = df
         self.transforms = transforms
@@ -61,7 +71,7 @@ class ContrailDataset(Dataset):
         Get the length of the dataset.
 
         Returns:
-            int: Length of the dataset
+            int: Length of the dataset.
         """
         return len(self.img_paths)
 
@@ -73,9 +83,9 @@ class ContrailDataset(Dataset):
             idx (int): Index.
 
         Returns:
-            np array [H x W x C]: Image.
-            torch tensor [1]: Label.
-            torch tensor [1]: Sample weight.
+            torch.Tensor: Image as a tensor of shape [C, H, W].
+            torch.Tensor: Mask as a tensor of shape [1 or 7, H, W].
+            torch.Tensor: Label as a tensor of shape [1].
         """
         path = self.img_paths[idx]
 
@@ -135,20 +145,17 @@ class ContrailDataset(Dataset):
 
 class ContrailInfDataset(Dataset):
     """
-    Image torch Dataset.
-    TODO
+    Image torch Dataset for inference.
 
     Methods:
-        __init__(df, transforms): Constructor
+        __init__(folders, transforms): Constructor
         __len__(): Get the length of the dataset
         __getitem__(idx): Get an item from the dataset
 
     Attributes:
-        df (pandas DataFrame): Metadata
-        img_paths (numpy array): Paths to the images
-        mask_paths (numpy array): Paths to the masks
+        folders (list): List of paths to the folders containing data for inference
         transforms (albumentation transforms): Transforms to apply
-        targets (numpy array): Target labels
+        frames (int or list or tuple): Frame indices or indices range to extract from false color images
     """
 
     def __init__(
@@ -161,8 +168,9 @@ class ContrailInfDataset(Dataset):
         Constructor.
 
         Args:
-            df (pandas DataFrame): Metadata.
+            folders (list): List of paths to the folders containing data for inference
             transforms (albumentation transforms, optional): Transforms to apply. Defaults to None.
+            frames (int or list or tuple, optional): Frame indices or indices range to extract from false color images. Defaults to 4.
         """
         self.folders = folders
         self.transforms = transforms
@@ -186,18 +194,18 @@ class ContrailInfDataset(Dataset):
 
         Returns:
             np array [H x W x C]: Image.
-            torch tensor [1]: Label.
-            torch tensor [1]: Sample weight.
+            np array [H x W]: Mask or 0 if mask is not available.
+            int: Sample weight (always 0).
         """
         bands, masks = load_record(self.folders[idx], folder="")
         false_color = get_false_color_img(bands)
 
         if isinstance(self.frames, int):
             image = false_color[..., self.frames]
-        else: # list, tuple
+        else:  # list, tuple
             image = false_color[..., np.array(self.frames)]
             image = image.reshape(image.shape[0], image.shape[1], -1)
-                
+
         image = (image * 255).astype(np.uint8)
 
         try:
