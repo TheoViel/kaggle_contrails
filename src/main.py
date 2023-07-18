@@ -107,10 +107,13 @@ def parse_args():
 #     # Model
 #     encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
 #     decoder_name = "Unet"
-    
+
 #     use_lstm = False
 #     bidirectional = bool(np.max(frames) > 4)
-
+#     use_cnn = False
+#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
+#     use_transfo = False
+    
 #     pretrained_weights = None
 #     reduce_stride = 1
 #     use_pixel_shuffle = False
@@ -139,7 +142,7 @@ def parse_args():
 #         "mix_alpha": 5,
 #         "additive_mix": True,
 #         "num_classes": num_classes,
-#         "num_workers": 0  #  if use_shape_descript else 8,
+#         "num_workers": 0 if use_shape_descript else 8,
 #     }
 
 #     optimizer_config = {
@@ -197,6 +200,9 @@ def parse_args():
 
 #     use_lstm = False
 #     bidirectional = bool(np.max(frames) > 4)
+#     use_cnn = False
+#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
+#     use_transfo = False
 
 #     pretrained_weights = None
 #     reduce_stride = 2
@@ -226,7 +232,7 @@ def parse_args():
 #         "mix_alpha": 5,
 #         "additive_mix": True,
 #         "num_classes": num_classes,
-#         "num_workers": 0,  #  if use_shape_descript else 8,
+#         "num_workers": 0 if use_shape_descript else 8,
 #     }
 
 #     optimizer_config = {
@@ -265,7 +271,7 @@ class Config:
     # Data
     processed_folder = "false_color/"
     use_raw = True
-    frames = [1, 2, 3, 4]  # [0, 1, 2, 3, 4, 5, 6, 7]
+    frames = [2, 3, 4, 5]  # [0, 1, 2, 3, 4, 5, 6, 7]
     size = 256
     aug_strength = 3
     use_soft_mask = True
@@ -278,7 +284,7 @@ class Config:
     selected_folds = [0]  # 1, 2, 3]  # [0]
 
     # Model
-    encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
+    encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
     decoder_name = "Unet"
     reduce_stride = 2
 
@@ -386,7 +392,7 @@ if __name__ == "__main__":
         config.data_config["batch_size"] = args.batch_size
         config.data_config["val_bs"] = args.batch_size
 
-    df = prepare_data(DATA_PATH, Config.processed_folder, use_raw=Config.use_raw)
+    df = prepare_data(DATA_PATH, config.processed_folder, use_raw=config.use_raw)
 
     if config.selected_folds == [1, 2, 3]:
         if "fold" not in df.columns:
@@ -408,7 +414,7 @@ if __name__ == "__main__":
     except Exception:
         run = None
         if config.local_rank == 0:
-            run = init_neptune(Config, log_folder)
+            run = init_neptune(config, log_folder)
 
             if args.fold > -1:
                 config.selected_folds = [args.fold]
@@ -433,7 +439,7 @@ if __name__ == "__main__":
 
     from training.main import k_fold
 #     df = df.head(1000)
-    k_fold(Config, df, log_folder=log_folder, run=run)
+    k_fold(config, df, log_folder=log_folder, run=run)
 
     if config.local_rank == 0:
         print("\nDone !")

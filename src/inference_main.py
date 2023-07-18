@@ -150,6 +150,7 @@ def kfold_inference(
         bidirectional=config.bidirectional if hasattr(config, "bidirectional") else False,
         use_cnn=config.use_cnn if hasattr(config, "use_cnn") else False,
         kernel_size=config.kernel_size if hasattr(config, "kernel_size") else 1,
+        use_transfo=config.use_transfo if hasattr(config, "use_transfo") else False,
     )
     model = model.cuda().eval()
 

@@ -90,6 +90,27 @@ def prepare_log_folder(log_path):
     return log_folder
 
 
+def get_last_log_folder(log_path):
+    today = str(datetime.date.today())
+    log_today = f"{log_path}{today}/"
+    
+    if not os.path.exists(log_today):
+        today = today - timedelta(days=1)
+        log_today = f"{log_path}{today}/"
+
+    exps = []
+    for f in os.listdir(log_today):
+        try:
+            exps.append(int(f))
+        except Exception:
+            continue
+    exp_id = np.max(exps)
+
+    log_folder = log_today + f"{exp_id}/"
+    return log_folder
+
+
+
 def save_config(config, path):
     """
     Saves a config as a json and pandas dataframe.
