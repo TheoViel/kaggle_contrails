@@ -5,4 +5,16 @@ cd src
 
 torchrun --nproc_per_node=8 main.py
 
-echo
+# echo
+
+# torchrun --nproc_per_node=8 main.py
+
+# echo
+
+# torchrun --nproc_per_node=8 main.py
+
+# echo
+
+# torchrun --nproc_per_node=8 main.py
+
+# echo

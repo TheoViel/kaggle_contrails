@@ -3,8 +3,10 @@ import re
 import cv2
 import torch
 import numpy as np
+import pandas as pd
 from torch.utils.data import Dataset
 
+from data.transforms import get_transfos
 from data.preparation import load_record, get_false_color_img
 
 
@@ -40,6 +42,7 @@ class ContrailDataset(Dataset):
         use_shape_descript=False,
         use_pl_masks=False,
         frames=4,
+        use_ext_data=False,
     ):
         """
         Constructor.
@@ -57,6 +60,7 @@ class ContrailDataset(Dataset):
         self.use_soft_mask = use_soft_mask
         self.use_shape_descript = use_shape_descript
         self.use_pl_masks = use_pl_masks
+        self.use_ext_data = use_ext_data
         self.frames = frames
 
         self.img_paths = df["img_path"].values
@@ -65,6 +69,12 @@ class ContrailDataset(Dataset):
         self.ids = df["record_id"].values
 
         self.targets = df["has_contrail"].values
+        
+        self.ext_data_prop = 0
+        if self.use_ext_data:
+            self.df_ext = pd.read_csv('../output/df_goes16_may.csv')
+            self.transfos_ext = get_transfos(strength=3, crop=True)
+            self.ext_data_prop = 0.5
 
     def __len__(self):
         """
@@ -74,6 +84,32 @@ class ContrailDataset(Dataset):
             int: Length of the dataset.
         """
         return len(self.img_paths)
+    
+    def _getitem_ext(self):
+        idx = np.random.randint(len(self.df_ext))
+
+        img_path = self.df_ext['img_path'].values[idx]
+        mask_path = self.df_ext['mask_path'].values[idx]
+        
+        image = cv2.imread(img_path)
+        mask = np.load(mask_path).astype(np.float32)
+
+        transformed = self.transfos_ext(image=image, mask=mask)
+        image = transformed["image"]
+        mask = transformed["mask"].unsqueeze(0).float()
+        
+        if self.use_shape_descript:
+            from data.shape_descript import get_shape_descript
+            shape_descript = get_shape_descript(
+                segmentation=(mask[0].numpy() > 0.5), sigma=(10, 10), voxel_size=(1, 1), downsample=2
+            )
+            shape_descript[-1] *= 4
+            shape_descript = np.clip(shape_descript, 0, 1)
+            mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
+            
+        y = (mask.max() > 0.5).float().view(1)
+            
+        return image, mask, y
 
     def __getitem__(self, idx):
         """
@@ -87,6 +123,9 @@ class ContrailDataset(Dataset):
             torch.Tensor: Mask as a tensor of shape [1 or 7, H, W].
             torch.Tensor: Label as a tensor of shape [1].
         """
+        if np.random.random() < self.ext_data_prop:
+            return self._getitem_ext()
+        
         path = self.img_paths[idx]
 
         if path.endswith('.png'):
@@ -115,7 +154,10 @@ class ContrailDataset(Dataset):
                 mask_pl = np.load(f'../logs/2023-07-06/23/pl_masks/{self.ids[idx]}.npy')
                 mask = (mask + mask_pl.astype(np.float32)) / 2
         else:
-            mask = cv2.imread(self.mask_paths[idx], 0)
+            if self.mask_paths[idx].endswith('.npy'):
+                mask = np.load(self.mask_paths[idx]).astype(np.float32)
+            else:
+                mask = cv2.imread(self.mask_paths[idx], 0)
 
         if self.transforms:
             transformed = self.transforms(image=image, mask=mask)
@@ -137,8 +179,13 @@ class ContrailDataset(Dataset):
         
         if image.size(0) > 3:
             image = image.view(3, -1, image.size(1), image.size(2)).transpose(0, 1)
-            
-#         print(image.shape)
+
+#         if image.size(1) > 256:  # Inf mode, this should be commented
+#             d = 16
+#             p1 = (d - image.size(1) % d) % d
+#             p2 = (d - image.size(2) % d) % d
+#             if p1 or p2:
+#                 image = torch.nn.functional.pad(image, (0, p1, 0, p2, 0, 0))
 
         return image, mask, y
 
@@ -216,5 +263,9 @@ class ContrailInfDataset(Dataset):
         if self.transforms:
             transformed = self.transforms(image=image)
             image = transformed["image"]
+            
+        if isinstance(image, torch.Tensor):
+            if image.size(0) > 3:
+                image = image.view(3, -1, image.size(1), image.size(2)).transpose(0, 1)
 
         return image, mask, 0

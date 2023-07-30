@@ -61,7 +61,7 @@ def plot_mask(img, mask):
     plt.axis(False)
 
 
-def plot_sample(img, mask, figsize=(18, 6)):
+def plot_sample(img, mask, figsize=(18, 6), n=3):
     """
     Plot a sample with the original image, the mask, and the contours.
 
@@ -73,15 +73,24 @@ def plot_sample(img, mask, figsize=(18, 6)):
     Returns:
         None: This function only displays the sample with the image, mask, and contours.
     """
+    if len(mask.shape) < len(img.shape):
+        mask = mask[:, :, None]
+
     plt.figure(figsize=figsize)
 
-    plt.subplot(1, 3, 1)
+    plt.subplot(1, n, 1)
     plt.imshow(img)
     plt.axis(False)
+    
+    if n == 3:
+        plt.subplot(1, n, 2)
+        plot_mask(img, mask)
 
-    plt.subplot(1, 3, 2)
-    plot_mask(img, mask)
+        plt.subplot(1, n, 3)
+        plot_contours(img, mask)
+    else:
+        assert n == 2
+        plt.subplot(1, n, 2)
+        plot_contours(img, mask)
 
-    plt.subplot(1, 3, 3)
-    plot_contours(img, mask)
     plt.show()

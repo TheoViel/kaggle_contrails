@@ -20,6 +20,7 @@ from segmentation_models_pytorch.base import (
 
 from model_zoo.aspp import ASPP
 import model_zoo.nextvit as nextvit
+from model_zoo.swin import swinv2_tiny_window16_256, swinv2_tiny_window8_256
 
 
 class DecoderBlock(nn.Module):
@@ -173,9 +174,7 @@ class UnetDecoder(nn.Module):
 #             print(i, x.size(), skip.size() if skip is not None else None)
             x = decoder_block(x, skip)
             xs.append(x)
-#             print(x.size())
 
-#         print(len(xs))
         if self.use_hypercolumns:
             h, w = x.size()[2:]
             x = torch.cat([
@@ -186,7 +185,6 @@ class UnetDecoder(nn.Module):
             ], 1)
 
             x = self.hypercolumns_conv(x)
-#             print(x.size())
 
         return x
 
@@ -290,6 +288,25 @@ class Unet(SegmentationModel):
             self.encoder.output_stride = 32
             encoder_depth = 4
             decoder_channels = decoder_channels[:encoder_depth]
+        elif "swinv2" in encoder_name:
+            # Stride is automatically reduced swinv2_tiny_window8_256
+            if "tiny_window16_256" in encoder_name:
+                self.encoder = swinv2_tiny_window16_256(pretrained=encoder_weights)
+                self.encoder.out_channels = [3, 96, 192, 384, 768]
+            elif "tiny_window8_256" in encoder_name:
+                self.encoder = swinv2_tiny_window8_256(pretrained=encoder_weights)
+                self.encoder.out_channels = [3, 96, 192, 384, 768]
+            else:
+                raise NotImplementedError
+            self.encoder.head = nn.Identity()
+            self.encoder.norm = nn.Identity()
+
+            self.encoder.patch_embed.proj.stride = (1, 1)
+            self.encoder.patch_embed.proj.padding = (1, 1)
+            self.encoder.output_stride = 32
+            encoder_depth = 4
+            decoder_channels = decoder_channels[:encoder_depth]
+            
         else:
             self.encoder = get_encoder(
                 encoder_name,

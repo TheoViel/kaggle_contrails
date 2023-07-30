@@ -196,6 +196,24 @@ def fit(
     avg_losses, dices = [], {}
     start_time = time.time()
     for epoch in range(1, epochs + 1):
+        if train_dataset.use_ext_data:  # update ext_data_prop
+            train_dataset.ext_data_prop = np.clip(
+                (epochs * 0.9 - epoch) / (epochs + 1),
+                0,
+                0.5
+            )
+            
+            train_loader, val_loader = define_loaders(
+                train_dataset,
+                val_dataset,
+                batch_size=data_config["batch_size"],
+                val_bs=data_config["val_bs"],
+                num_workers=data_config["num_workers"],
+                distributed=distributed,
+                world_size=world_size,
+                local_rank=local_rank,
+            )
+            
         if distributed:
             try:
                 train_loader.sampler.set_epoch(epoch)

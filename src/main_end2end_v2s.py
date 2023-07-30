@@ -82,7 +82,7 @@ class Config:
     size = 256
     aug_strength = 3
     use_soft_mask = True
-    use_shape_descript = True
+    use_shape_descript = False
     use_pl_masks = False
 
     # k-fold
@@ -101,7 +101,7 @@ class Config:
     use_transfo = False
 
     pretrained_weights = None
-    reduce_stride = 2
+    reduce_stride = 1
     use_pixel_shuffle = False
     use_hypercolumns = False
     center = "none"
@@ -135,10 +135,10 @@ class Config:
         "name": "AdamW",
         "lr": 1e-3,
         "lr_encoder": 1e-3,
-        "warmup_prop": 0.,  # 0.05
+        "warmup_prop": 0.,
         "betas": (0.9, 0.999),
         "max_grad_norm": 1.0,
-        "weight_decay": 0.05,  # 0.2
+        "weight_decay": 0.2,
     }
 
     epochs = 40
@@ -169,11 +169,11 @@ class Config2:
     # Data
     processed_folder = "false_color/"
     use_raw = True
-    frames = [2, 3, 4, 5]  # [0, 1, 2, 3, 4, 5, 6, 7]
+    frames = [0, 1, 2, 3, 4, 5, 6, 7]
     size = 256
     aug_strength = 3
     use_soft_mask = True
-    use_shape_descript = True
+    use_shape_descript = False
     use_pl_masks = False
 
     # k-fold
@@ -184,7 +184,7 @@ class Config2:
     # Model
     encoder_name = "tf_efficientnetv2_s"
     decoder_name = "Unet"
-    reduce_stride = 2
+    reduce_stride = 1
 
     use_lstm = True
     bidirectional = bool(np.max(frames) > 4)
@@ -230,7 +230,7 @@ class Config2:
         "warmup_prop": 0. if pretrained_weights is None else 0.1,
         "betas": (0.9, 0.999),
         "max_grad_norm": 1.0,
-        "weight_decay": 0.05,  # 2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
+        "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
     }
 
     epochs = 10 if data_config["batch_size"] == 4 else 20
@@ -324,7 +324,7 @@ if __name__ == "__main__":
         print("\n -> Training\n")
 
     from training.main import k_fold
-#     df = df.head(1000)
+    # df = df.head(1000)
     k_fold(config, df, log_folder=log_folder, run=run)
 
     # -------- Stage 2 -------- #

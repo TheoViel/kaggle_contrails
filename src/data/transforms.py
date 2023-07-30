@@ -1,5 +1,42 @@
+import random
+import numpy as np
 import albumentations as albu
 from albumentations.pytorch import ToTensorV2
+
+
+class CropNonEmptyMaskIfExists(albu.CropNonEmptyMaskIfExists):
+    def update_params(self, params, **kwargs):
+        super().update_params(params, **kwargs)
+
+        if "mask" in kwargs:
+            mask = self._preprocess_mask(kwargs["mask"])
+        elif "masks" in kwargs and len(kwargs["masks"]):
+            masks = kwargs["masks"]
+            mask = self._preprocess_mask(np.copy(masks[0]))  # need copy as we perform in-place mod afterwards
+            for m in masks[1:]:
+                mask |= self._preprocess_mask(m)
+        else:
+            raise RuntimeError("Can not find mask for CropNonEmptyMaskIfExists")
+
+        mask_height, mask_width = mask.shape[:2]
+
+        if (mask > 0.5).any():
+            mask = mask.sum(axis=-1) if mask.ndim == 3 else mask
+            non_zero_yx = np.argwhere(mask > 0.5)
+            y, x = random.choice(non_zero_yx)
+            x_min = x - random.randint(0, self.width - 1)
+            y_min = y - random.randint(0, self.height - 1)
+            x_min = np.clip(x_min, 0, mask_width - self.width)
+            y_min = np.clip(y_min, 0, mask_height - self.height)
+        else:
+            x_min = random.randint(0, mask_width - self.width)
+            y_min = random.randint(0, mask_height - self.height)
+
+        x_max = x_min + self.width
+        y_max = y_min + self.height
+
+        params.update({"x_min": x_min, "x_max": x_max, "y_min": y_min, "y_max": y_max})
+        return params
 
 
 def blur_transforms(p=0.5, blur_limit=5):
@@ -41,7 +78,7 @@ def color_transforms(p=0.5):
     )
 
 
-def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0):
+def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0, crop=False):
     """
     Returns transformations for image augmentation.
 
@@ -55,9 +92,9 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0):
     Returns:
         albumentation transforms: Transforms for image augmentation.
     """
-    resize_aug = []
-    #     albu.Resize(resize[0], resize[1])
-    # ] if resize else []
+    resize_aug = [
+        CropNonEmptyMaskIfExists(resize[0], resize[1], always_apply=True)
+    ] if crop else []
 
     normalizer = albu.Compose(
         resize_aug

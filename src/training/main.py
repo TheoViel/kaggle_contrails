@@ -32,14 +32,20 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         dict: Dice scores at different thresholds.
     """
     df_train_ = df_train[df_train['has_contrail']] if config.two_stage else df_train
+    
+    transforms = get_transfos(
+        strength=config.aug_strength,
+        crop=config.pretrain if hasattr(config, "pretrain") else False
+    )
 
     train_dataset = ContrailDataset(
         df_train_.reset_index(drop=True),
-        transforms=get_transfos(strength=config.aug_strength),
+        transforms=transforms,
         use_soft_mask=config.use_soft_mask,
         use_shape_descript=config.use_shape_descript,
         use_pl_masks=config.use_pl_masks,
         frames=config.frames,
+        use_ext_data=config.use_ext_data if hasattr(config, "use_ext_data") else False
     )
 
     val_dataset = ContrailDataset(
@@ -67,6 +73,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         n_channels=config.n_channels,
         pretrained_weights=pretrained_weights,
         reduce_stride=config.reduce_stride,
+        upsample=config.upsample  if hasattr(config, "upsample") else False,
         use_pixel_shuffle=config.use_pixel_shuffle,
         use_hypercolumns=config.use_hypercolumns,
         center=config.center,
@@ -77,6 +84,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         use_cnn=config.use_cnn,
         kernel_size=config.kernel_size,
         use_transfo=config.use_transfo,
+        two_layers=config.two_layers if hasattr(config, "two_layers") else False,
         verbose=(config.local_rank == 0),
     ).cuda()
 
@@ -196,6 +204,11 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
             val_idx = list(df[df["fold"] == fold].index)
 
             df_train = df.iloc[train_idx].reset_index(drop=True)
+            
+            if hasattr(config, "pretrain"):
+                if config.pretrain:
+                    df_train = pd.read_csv('../output/df_goes16_may.csv')
+
             df_val = df.iloc[val_idx].reset_index(drop=True)
 
             if len(df) <= 1000:

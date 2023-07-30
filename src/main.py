@@ -17,12 +17,17 @@ from params import DATA_PATH
 WEIGHTS = {
     "tf_efficientnetv2_s":
     {
-        1: "../logs/2023-07-03/30/",
-        2: "../logs/2023-07-03/35/",
+#         1: "../logs/2023-07-03/30/",
+#         2: "../logs/2023-07-03/35/",
+        2: "../logs/2023-07-30/6/"
     },
     "convnextv2_nano":
     {
-        2: "../logs/2023-07-05/35/"  #
+#         2: "../logs/2023-07-05/35/",  # ref
+#         2: "../logs/2023-07-17/10/",
+        1: "../logs/2023-07-17/10/",
+#         2: "../logs/2023-07-18/0/",  # cnn pretrained
+        2: "../logs/2023-07-18/12/",  # cnn pretrained
     },
 }
 
@@ -77,185 +82,103 @@ def parse_args():
     )
     return parser.parse_args()
 
+    
+class Config:
+    """
+    Parameters used for training
+    """
 
-# class Config:
-#     """
-#     Parameters used for training
-#     """
+    # General
+    seed = 42
+    verbose = 1
+    device = "cuda"
+    save_weights = True
 
-#     # General
-#     seed = 42
-#     verbose = 1
-#     device = "cuda"
-#     save_weights = True
+    # Data
+    processed_folder = "false_color/"
+    use_raw = False
+    frames = 4
+    size = 256
+    aug_strength = 3
+    use_soft_mask = True
+    use_shape_descript = False
+    use_pl_masks = False
+    
+    use_ext_data = True
 
-#     # Data
-#     processed_folder = "false_color/"
-#     use_raw = True
-#     frames = 4
-#     size = 256
-#     aug_strength = 3
-#     use_soft_mask = True
-#     use_shape_descript = False
-#     use_pl_masks = False
+    # k-fold
+    k = 4
+    folds_file = f"../input/folds_{k}.csv"
+    selected_folds = [0]  # 1, 2, 3]  # [0]
 
-#     # k-fold
-#     k = 4
-#     folds_file = f"../input/folds_{k}.csv"
-#     selected_folds = [0]  # 1, 2, 3]  # [0]
+    # Model
+    encoder_name = "tf_efficientnetv2_m"
+    decoder_name = "Unet"
+    pretrained_weights = None
 
-#     # Model
-#     encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
-#     decoder_name = "Unet"
+    use_lstm = False
+    bidirectional = False
+    use_cnn = False
+    kernel_size = 0
+    use_transfo = False
+    two_layers = False
 
-#     use_lstm = False
-#     bidirectional = bool(np.max(frames) > 4)
-#     use_cnn = False
-#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
-#     use_transfo = False
+    reduce_stride = 1
+    upsample = False
 
-#     pretrained_weights = None
-#     reduce_stride = 1
-#     use_pixel_shuffle = False
-#     use_hypercolumns = False
-#     center = "none"
-#     n_channels = 3
-#     num_classes = 7 if use_shape_descript else 1
+    use_pixel_shuffle = False
+    use_hypercolumns = False
+    center = "none"
+    n_channels = 3
+    num_classes = 7 if use_shape_descript else 1
 
-#     # Training
-#     loss_config = {
-#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-#         "smoothing": 0.,
-#         "activation": "sigmoid",
-#         "aux_loss_weight": 0.,
-#         "activation_aux": "sigmoid",
-#         "ousm_k": 0,
-#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
-#         "shape_loss": "bce",
-#     }
+    # Training
+    loss_config = {
+        "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
+        "smoothing": 0.,
+        "activation": "sigmoid",
+        "aux_loss_weight": 0.,
+        "activation_aux": "sigmoid",
+        "ousm_k": 0,
+        "shape_loss_w": 0.1 if use_shape_descript else 0.,
+        "shape_loss": "bce",
+    }
 
-#     data_config = {
-#         "batch_size": 16,
-#         "val_bs": 32,
-#         "mix": "cutmix",
-#         "mix_proba": 0.5,
-#         "mix_alpha": 5,
-#         "additive_mix": True,
-#         "num_classes": num_classes,
-#         "num_workers": 0 if use_shape_descript else 8,
-#     }
+    data_config = {
+        "batch_size": 16,
+        "val_bs": 32,
+        "mix": "cutmix",
+        "mix_proba": 0.5,
+        "mix_alpha": 5,
+        "additive_mix": True,
+        "num_classes": num_classes,
+        "num_workers": 0 if use_shape_descript else 8,
+    }
 
-#     optimizer_config = {
-#         "name": "AdamW",
-#         "lr": 1e-3,
-#         "lr_encoder": 1e-3,
-#         "warmup_prop": 0.,  # 0.05
-#         "betas": (0.9, 0.999),
-#         "max_grad_norm": 1.0,
-#         "weight_decay": 0.2,  # 0.05
-#     }
+    optimizer_config = {
+        "name": "AdamW",
+        "lr": 1e-3,
+        "lr_encoder": 1e-3,
+        "warmup_prop": 0.,
+        "betas": (0.9, 0.999),
+        "max_grad_norm": 1.0,
+        "weight_decay": 0.2,
+    }
 
-#     epochs = 40
-#     two_stage = False
+    epochs = 100
 
-#     use_fp16 = True
-#     model_soup = False
+    two_stage = False
 
-#     verbose = 1
-#     verbose_eval = 200
+    use_fp16 = True
+    model_soup = False
 
-#     fullfit = False  # len(selected_folds) == 4
-#     n_fullfit = 1
+    verbose = 1
+    verbose_eval = 200
 
+    fullfit = False  # len(selected_folds) == 4
+    n_fullfit = 1
 
-# class Config:
-#     """
-#     Parameters used for training
-#     """
-
-#     # General
-#     seed = 42
-#     verbose = 1
-#     device = "cuda"
-#     save_weights = True
-
-#     # Data
-#     processed_folder = "false_color/"
-#     use_raw = True
-#     frames = 4
-#     size = 256
-#     aug_strength = 3
-#     use_soft_mask = True
-#     use_shape_descript = True
-#     use_pl_masks = False
-
-#     # k-fold
-#     k = 4
-#     folds_file = f"../input/folds_{k}.csv"
-#     selected_folds = [0] #, 1, 2, 3]
-
-#     # Model
-#     encoder_name = "convnextv2_nano"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
-#     decoder_name = "Unet"
-
-#     use_lstm = False
-#     bidirectional = bool(np.max(frames) > 4)
-#     use_cnn = False
-#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
-#     use_transfo = False
-
-#     pretrained_weights = None
-#     reduce_stride = 2
-#     use_pixel_shuffle = False
-#     use_hypercolumns = False
-#     center = "none"
-#     n_channels = 3
-#     num_classes = 7 if use_shape_descript else 1
-
-#     # Training
-#     loss_config = {
-#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-#         "smoothing": 0.,
-#         "activation": "sigmoid",
-#         "aux_loss_weight": 0.,
-#         "activation_aux": "sigmoid",
-#         "ousm_k": 0,
-#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
-#         "shape_loss": "bce",
-#     }
-
-#     data_config = {
-#         "batch_size": 8,
-#         "val_bs": 16,
-#         "mix": "cutmix",
-#         "mix_proba": 0.5,
-#         "mix_alpha": 5,
-#         "additive_mix": True,
-#         "num_classes": num_classes,
-#         "num_workers": 0 if use_shape_descript else 8,
-#     }
-
-#     optimizer_config = {
-#         "name": "AdamW",
-#         "lr": 3e-4,
-#         "lr_encoder": 3e-4,
-#         "warmup_prop": 0.05,
-#         "betas": (0.9, 0.999),
-#         "max_grad_norm": 1.0,
-#         "weight_decay": 0.05,
-#     }
-
-#     epochs = 30
-#     two_stage = False
-
-#     use_fp16 = True
-#     model_soup = False
-
-#     verbose = 1
-#     verbose_eval = 200
-
-#     fullfit = False  # len(selected_folds) == 4
-#     n_fullfit = 1
+    
 
 class Config:
     """
@@ -271,12 +194,14 @@ class Config:
     # Data
     processed_folder = "false_color/"
     use_raw = True
-    frames = [2, 3, 4, 5]  # [0, 1, 2, 3, 4, 5, 6, 7]
+    frames = [2, 3, 4, 5]
     size = 256
     aug_strength = 3
     use_soft_mask = True
     use_shape_descript = False
     use_pl_masks = False
+    
+    use_ext_data = False
 
     # k-fold
     k = 4
@@ -284,17 +209,19 @@ class Config:
     selected_folds = [0]  # 1, 2, 3]  # [0]
 
     # Model
-    encoder_name = "tf_efficientnetv2_s"  # tf_efficientnetv2_s seresnext50_32x4d efficientnetv2_rw_t convnextv2_tiny convnextv2_nano
+    encoder_name = "tf_efficientnetv2_s"
     decoder_name = "Unet"
     reduce_stride = 2
+    upsample = False
 
-    use_lstm = False
+    use_lstm = True
     bidirectional = bool(np.max(frames) > 4)
     use_cnn = False
     kernel_size = (1 if use_lstm else len(frames), 3, 3)
-    use_transfo = True
+    use_transfo = False
+    two_layers = False
 
-    pretrained_weights = WEIGHTS[encoder_name][reduce_stride]  # None
+    pretrained_weights = "../logs/2023-07-30/6/"
 
     use_pixel_shuffle = False
     use_hypercolumns = False
@@ -348,6 +275,7 @@ class Config:
     n_fullfit = 1
 
 
+    
 if __name__ == "__main__":
     warnings.simplefilter("ignore", UserWarning)
 

@@ -29,6 +29,7 @@ def define_model(
     n_channels=3,
     pretrained_weights=None,
     reduce_stride=False,
+    upsample=False,
     use_pixel_shuffle=False,
     use_hypercolumns=False,
     center="none",
@@ -39,6 +40,7 @@ def define_model(
     use_cnn=False,
     kernel_size=5,
     use_transfo=False,
+    two_layers=False,
     verbose=0,
 ):
     """
@@ -107,7 +109,10 @@ def define_model(
         use_cnn=use_cnn,
         kernel_size=kernel_size,
         use_transfo=use_transfo,
+        two_layers=two_layers,
     )
+    
+    model.upsample = 2 ** reduce_stride if upsample else 0
     model.reduce_stride(encoder_name, decoder_name, reduce_stride)
 
     if pretrained_weights is not None:
@@ -134,6 +139,7 @@ class SegWrapper(nn.Module):
         use_cnn=False,
         kernel_size=3,
         use_transfo=False,
+        two_layers=False,
     ):
         """
         Constructor.
@@ -154,6 +160,7 @@ class SegWrapper(nn.Module):
         self.use_cnn = use_cnn
         self.use_transfo = use_transfo
         self.frames = frames
+        self.two_layers = two_layers
 
         if use_lstm or use_cnn:
             assert isinstance(frames, (tuple, list)), "frames must be tuple or int"
@@ -168,6 +175,13 @@ class SegWrapper(nn.Module):
                 batch_first=True,
                 bidirectional=bidirectional
             )
+            if self.two_layers:
+                self.lstm_2 = nn.LSTM(
+                    model.encoder.out_channels[-2],
+                    model.encoder.out_channels[-2] // (1 + bidirectional),
+                    batch_first=True,
+                    bidirectional=bidirectional
+                )
         if self.use_cnn:
             if isinstance(kernel_size, int):
                 kernel_size = (kernel_size, kernel_size, kernel_size)
@@ -182,28 +196,53 @@ class SegWrapper(nn.Module):
                 nn.BatchNorm3d(model.encoder.out_channels[-1]),
                 nn.ReLU(),
             )
+            if self.two_layers:
+                self.cnn_2 = nn.Sequential(
+                    nn.Conv3d(
+                        model.encoder.out_channels[-2],
+                        model.encoder.out_channels[-2],
+                        kernel_size=kernel_size,
+                        padding=(kernel_size[0] // 2 if use_lstm else 0, kernel_size[1] // 2, kernel_size[2] // 2)
+                    ),
+                    nn.BatchNorm3d(model.encoder.out_channels[-2]),
+                    nn.ReLU(),
+                )
 
         if self.use_transfo:
-            self.transfo = Tmixer(model.encoder.out_channels[-1],)
+            self.transfo = Tmixer(model.encoder.out_channels[-1])
+            if self.two_layers:
+                self.transfo_2 = Tmixer(model.encoder.out_channels[-2])
 
     def reduce_stride(self, encoder_name, decoder_name="Unet", reduce_stride=0):
         if "nextvit" in encoder_name:
             return
 
+        if "swinv2" in encoder_name:
+            assert reduce_stride == 2
+            if decoder_name == "Unet":
+                if len(self.model.decoder.blocks) >= 4:
+                    self.model.decoder.blocks[3].upscale = False
+                    self.model.decoder.blocks[3].pixel_shuffle = nn.Identity()
+            return
+        
         if reduce_stride == 0:
             return
 
-        if "nfnet" in encoder_name:
-            self.model.encoder.model.stem_conv1.stride = (1, 1)
-        elif "efficientnet" in encoder_name:
-            self.model.encoder.model.conv_stem.stride = (1, 1)
-        elif "resnet" in encoder_name or "resnext" in encoder_name:
-            self.model.encoder.model.conv1.stride = (1, 1)
-        elif "convnext" in encoder_name:
-            self.model.encoder.stem[0].stride = (2, 2)
-            self.model.encoder.stem[0].padding = (1, 1)
-        else:
-            raise NotImplementedError
+        if not self.upsample:
+            if "nfnet" in encoder_name:
+                self.model.encoder.model.stem_conv1.stride = (1, 1)
+            elif "efficientnet" in encoder_name:
+                self.model.encoder.model.conv_stem.stride = (1, 1)
+            elif "resnet" in encoder_name or "resnext" in encoder_name:
+                try:
+                    self.model.encoder.model.conv1[0].stride = (1, 1)
+                except:
+                    self.model.encoder.model.conv1.stride = (1, 1)
+            elif "convnext" in encoder_name:
+                self.model.encoder.stem[0].stride = (2, 2)
+                self.model.encoder.stem[0].padding = (1, 1)
+            else:
+                raise NotImplementedError
 
         if decoder_name == "Unet":
             if len(self.model.decoder.blocks) >= 5:
@@ -211,12 +250,15 @@ class SegWrapper(nn.Module):
                 self.model.decoder.blocks[4].pixel_shuffle = nn.Identity()
 
         if reduce_stride >= 2:
-            if "efficientnetv2" in encoder_name:
-                self.model.encoder.model.blocks[1][0].conv_exp.stride = (1, 1)
-            elif "efficientnet" in encoder_name:
-                self.model.encoder.model.blocks[1][0].conv_dw.stride = (1, 1)
-            elif "convnext" in encoder_name:
-                self.model.encoder.stem[0].stride = (1, 1)
+            if not self.upsample:
+                if "efficientnetv2" in encoder_name:
+                    self.model.encoder.model.blocks[1][0].conv_exp.stride = (1, 1)
+                elif "efficientnet" in encoder_name:
+                    self.model.encoder.model.blocks[1][0].conv_dw.stride = (1, 1)
+                elif "convnext" in encoder_name:
+                    self.model.encoder.stem[0].stride = (1, 1)
+                elif "resnet" in encoder_name or "resnext" in encoder_name:
+                    self.model.encoder.model.maxpool.stride = 1
             if decoder_name == "Unet":
                 if len(self.model.decoder.blocks) >= 4:
                     self.model.decoder.blocks[3].upscale = False
@@ -242,7 +284,15 @@ class SegWrapper(nn.Module):
             bs, c, h, w = x.size()
             n_frames = 1
 
+        if self.upsample > 1:
+#             print(x.size())
+            x = nn.functional.interpolate(x, scale_factor=self.upsample, mode="bilinear")
+#             print(x.size())
+
         features = self.model.encoder(x)
+        
+#         for ft in features:
+#             print(ft.size())
 
         if self.use_lstm or self.use_cnn or self.use_transfo:
             assert n_frames > 1, "Only one frame, cannot use LSTM / CNN"
@@ -250,28 +300,43 @@ class SegWrapper(nn.Module):
             frame_idx = self.frames.index(4)
 
             for i, ft in enumerate(features):
-                # print(ft.size())
+#                 print(ft.size())
 
                 if i != len(features) - 1:  # not last layer
-                    ft = ft.view(bs, n_frames, ft.size(1), ft.size(2), ft.size(3))[:, frame_idx]
-                    features_.append(ft)
-                    continue
-
+                    if self.two_layers and (i == len(features) - 2):
+#                         print(i)
+                        pass
+                    else:
+                        ft = ft.view(bs, n_frames, ft.size(1), ft.size(2), ft.size(3))[:, frame_idx]
+                        features_.append(ft)
+#                         print(f'skip {i}')
+                        continue
+                
+#                 print('2.5D !')
                 _, n_fts, h, w = ft.size()
                 ft = ft.view(bs, n_frames, n_fts, h, w)
 
                 if self.use_transfo:
-                    ft = self.transfo(ft, frame_idx=frame_idx)
+                    if i == len(features) - 2:
+                        ft = self.transfo_2(ft, frame_idx=frame_idx)
+                    else:
+                        ft = self.transfo(ft, frame_idx=frame_idx)
 
                 if self.use_cnn:
                     ft = ft.permute(0, 2, 1, 3, 4).contiguous()  # bs x n_fts x n_frames h x w
-                    ft = self.cnn(ft)  # bs x n_fts x h x w
+                    if i == len(features) - 2:
+                        ft = self.cnn_2(ft)  # bs x n_fts x h x w
+                    else:
+                        ft = self.cnn(ft)  # bs x n_fts x h x w
 
                 if self.use_lstm:
                     ft = ft.permute(0, 3, 4, 2, 1).contiguous()  # bs x h x w x n_frames x n_fts
                     ft = ft.view(bs * h * w, n_frames, n_fts)
 
-                    ft = self.lstm(ft)[0][:, frame_idx]  # bs x h x w x n_fts
+                    if i == len(features) - 2:
+                        ft = self.lstm_2(ft)[0][:, frame_idx]  # bs x h x w x n_fts
+                    else:
+                        ft = self.lstm(ft)[0][:, frame_idx]  # bs x h x w x n_fts
 
                     ft = ft.view(bs, h, w, n_fts).permute(0, 3, 1, 2)  # bs x n_fts x h x w
 

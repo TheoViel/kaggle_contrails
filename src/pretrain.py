@@ -8,10 +8,27 @@ import pandas as pd
 
 from data.preparation import prepare_data
 from util.torch import init_distributed
-from util.logger import create_logger, save_config, prepare_log_folder, init_neptune, get_last_log_folder
+from util.logger import create_logger, save_config, prepare_log_folder, init_neptune
 # from util.gpu_affinity import set_affinity
 
 from params import DATA_PATH
+
+
+WEIGHTS = {
+    "tf_efficientnetv2_s":
+    {
+        1: "../logs/2023-07-03/30/",
+        2: "../logs/2023-07-03/35/",
+    },
+    "convnextv2_nano":
+    {
+#         2: "../logs/2023-07-05/35/",  # ref
+#         2: "../logs/2023-07-17/10/",
+        1: "../logs/2023-07-17/10/",
+#         2: "../logs/2023-07-18/0/",  # cnn pretrained
+        2: "../logs/2023-07-18/12/",  # cnn pretrained
+    },
+}
 
 
 def parse_args():
@@ -82,19 +99,17 @@ class Config:
     frames = 4
     size = 256
     aug_strength = 3
-    use_soft_mask = True
-    use_shape_descript = True
+    use_soft_mask = False
+    use_shape_descript = False
     use_pl_masks = False
-    
-    use_ext_data = False
 
     # k-fold
     k = 4
     folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0]  # , 1, 2, 3]
+    selected_folds = [0]  # 1, 2, 3]  # [0]
 
     # Model
-    encoder_name = "convnextv2_nano"
+    encoder_name = "tf_efficientnetv2_s"
     decoder_name = "Unet"
 
     use_lstm = False
@@ -106,14 +121,12 @@ class Config:
 
     pretrained_weights = None
     reduce_stride = 2
-    upsample = True
-
     use_pixel_shuffle = False
     use_hypercolumns = False
     center = "none"
     n_channels = 3
     num_classes = 7 if use_shape_descript else 1
-
+    
     # Training
     loss_config = {
         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
@@ -127,8 +140,8 @@ class Config:
     }
 
     data_config = {
-        "batch_size": 8,
-        "val_bs": 16,
+        "batch_size": 16,
+        "val_bs": 32,
         "mix": "cutmix",
         "mix_proba": 0.5,
         "mix_alpha": 5,
@@ -139,15 +152,16 @@ class Config:
 
     optimizer_config = {
         "name": "AdamW",
-        "lr": 2e-4,
-        "lr_encoder": 2e-4,
-        "warmup_prop": 0.05,
+        "lr": 1e-3,
+        "lr_encoder": 1e-3,
+        "warmup_prop": 0.,
         "betas": (0.9, 0.999),
         "max_grad_norm": 1.0,
-        "weight_decay": 0.05,
+        "weight_decay": 0.2,
     }
 
-    epochs = 30
+    epochs = 40
+
     two_stage = False
 
     use_fp16 = True
@@ -158,98 +172,9 @@ class Config:
 
     fullfit = False  # len(selected_folds) == 4
     n_fullfit = 1
+    
+    pretrain = True
 
-
-# class Config2:
-#     """
-#     Parameters used for training
-#     """
-
-#     # General
-#     seed = 42
-#     verbose = 1
-#     device = "cuda"
-#     save_weights = True
-
-#     # Data
-#     processed_folder = "false_color/"
-#     use_raw = True
-#     frames = [1, 2, 3, 4]  # [0, 1, 2, 3, 4, 5, 6, 7]
-#     size = 256
-#     aug_strength = 3
-#     use_soft_mask = True
-#     use_shape_descript = False  # True
-#     use_pl_masks = False
-
-#     # k-fold
-#     k = 4
-#     folds_file = f"../input/folds_{k}.csv"
-#     selected_folds = [0]  # 1, 2, 3]  # [0]
-
-#     # Model
-#     encoder_name = "convnextv2_nano"
-#     decoder_name = "Unet"
-#     reduce_stride = 2
-
-#     use_lstm = False
-#     bidirectional = bool(np.max(frames) > 4)
-#     use_cnn = True
-#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
-#     use_transfo = False
-#     two_layers = True
-
-#     pretrained_weights = "../logs/2023-07-18/4/"
-
-#     use_pixel_shuffle = False
-#     use_hypercolumns = False
-#     center = "none"
-#     n_channels = 3
-#     num_classes = 7 if use_shape_descript else 1
-
-#     # Training
-#     loss_config = {
-#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-#         "smoothing": 0.,
-#         "activation": "sigmoid",
-#         "aux_loss_weight": 0.,
-#         "activation_aux": "sigmoid",
-#         "ousm_k": 0,
-#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
-#         "shape_loss": "bce",
-#     }
-
-#     data_config = {
-#         "batch_size": 8 if reduce_stride == 1 else 4,
-#         "val_bs": 8,
-#         "mix": "cutmix",
-#         "mix_proba": 0.5,
-#         "mix_alpha": 5,
-#         "additive_mix": True,
-#         "num_classes": num_classes,
-#         "num_workers": 0 if use_shape_descript else 8,
-#     }
-
-#     optimizer_config = {
-#         "name": "AdamW",
-#         "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
-#         "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
-#         "warmup_prop": 0. if pretrained_weights is None else 0.1,
-#         "betas": (0.9, 0.999),
-#         "max_grad_norm": 1.0,
-#         "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
-#     }
-
-#     epochs = 10 if data_config["batch_size"] == 4 else 20
-#     two_stage = False
-
-#     use_fp16 = True
-#     model_soup = False
-
-#     verbose = 1
-#     verbose_eval = 200
-
-#     fullfit = False  # len(selected_folds) == 4
-#     n_fullfit = 1
 
 
 if __name__ == "__main__":
@@ -257,6 +182,12 @@ if __name__ == "__main__":
 
     config = Config
     init_distributed(config)
+
+    #  ['socket', 'single', 'single_unique', 'socket_unique_interleaved', 'socket_unique_continuous', 'disabled']
+    # affinity = set_affinity(
+    #     config.local_rank, torch.cuda.device_count(), "socket_unique_interleaved"
+    # )
+    # print(f'{config.local_rank}: thread affinity: {sorted(list(affinity))}')
 
     if config.local_rank == 0:
         print("\nStarting !")
@@ -276,9 +207,6 @@ if __name__ == "__main__":
         if config.local_rank == 0:
             log_folder = prepare_log_folder(LOG_PATH)
             print(f'\n -> Logging results to {log_folder}\n')
-        else:
-            time.sleep(1)
-            log_folder = get_last_log_folder(LOG_PATH)
 
     if args.model:
         config.name = args.model
@@ -304,19 +232,28 @@ if __name__ == "__main__":
         if config.local_rank == 0:
             print('\n-> Excluding validation data\n')
 
-    run = None
-    if config.local_rank == 0:
-        run = init_neptune(config, log_folder)
+    try:
+        print(torch_performance_linter)  # noqa
+        if config.local_rank == 0:
+            print("Using TPL\n")
+        run = None
+        config.epochs = 1
+        log_folder = None
+        df = df.head(10000)
+    except Exception:
+        run = None
+        if config.local_rank == 0:
+            run = init_neptune(config, log_folder)
 
-        if args.fold > -1:
-            config.selected_folds = [args.fold]
-            create_logger(directory=log_folder, name=f"logs_{args.fold}.txt")
-        else:
-            create_logger(directory=log_folder, name="logs.txt")
+            if args.fold > -1:
+                config.selected_folds = [args.fold]
+                create_logger(directory=log_folder, name=f"logs_{args.fold}.txt")
+            else:
+                create_logger(directory=log_folder, name="logs.txt")
 
-        save_config(config, log_folder + "config.json")
-        if run is not None:
-            run["global/config"].upload(log_folder + "config.json")
+            save_config(config, log_folder + "config.json")
+            if run is not None:
+                run["global/config"].upload(log_folder + "config.json")
 
     if config.local_rank == 0:
         print("Device :", torch.cuda.get_device_name(0), "\n")
@@ -332,43 +269,6 @@ if __name__ == "__main__":
     from training.main import k_fold
 #     df = df.head(1000)
     k_fold(config, df, log_folder=log_folder, run=run)
-
-#     # -------- Stage 2 -------- #
-
-#     # Update Config
-#     config2 = Config2
-#     config2.pretrained_weights = log_folder
-#     config2.seed = config.seed
-#     config2.world_size = config.world_size
-#     config2.rank = config.rank
-#     config2.local_rank = config.local_rank
-#     config2.device = config.device
-#     config2.distributed = config.distributed
-#     config = config2
-
-#     # Logging
-#     if config.local_rank == 0:
-#         log_folder = prepare_log_folder(LOG_PATH)
-#         print(f'\n -> Logging results to {log_folder}\n')
-
-#         print(f"\n- Frames  : {config.frames}")
-#         print(f"- LSTM    : {config.use_lstm}")
-#         print(f"- CNN     : {config.use_cnn}")
-#         print(f"- Transfo : {config.use_transfo}")
-#         print("\n -> 2.5D Fine-tuning\n")
-
-#         print(config.pretrained_weights)
-
-#         run = init_neptune(config, log_folder)
-#         create_logger(directory=log_folder, name="logs.txt")
-
-#         save_config(config, log_folder + "config.json")
-#         run["global/config"].upload(log_folder + "config.json")
-
-#     # Train
-#     df = prepare_data(DATA_PATH, config.processed_folder, use_raw=config.use_raw)
-
-#     k_fold(config, df, log_folder=log_folder, run=run)
 
     if config.local_rank == 0:
         print("\nDone !")
