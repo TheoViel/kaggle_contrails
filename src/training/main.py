@@ -45,7 +45,8 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         use_shape_descript=config.use_shape_descript,
         use_pl_masks=config.use_pl_masks,
         frames=config.frames,
-        use_ext_data=config.use_ext_data if hasattr(config, "use_ext_data") else False
+        use_ext_data=config.use_ext_data if hasattr(config, "use_ext_data") else False,
+        aug_strength=config.aug_strength,
     )
 
     val_dataset = ContrailDataset(
@@ -219,7 +220,7 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
             )
             scores.append(dices)
 
-    if config.local_rank == 0:
+    if config.local_rank == 0 and len(config.selected_folds):
         dices = {th: np.mean([dice[th] for dice in scores]) for th in scores[0].keys()}
         th, dice = max(dices.items(), key=operator.itemgetter(1))
 

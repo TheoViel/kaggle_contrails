@@ -5,10 +5,3 @@ cd src
 
 torchrun --nproc_per_node=8 main_end2end_v2s.py
 # torchrun --nproc_per_node=8 main_end2end_convnext.py
-echo
-
-torchrun --nproc_per_node=8 main_end2end_v2s.py
-
-echo
-
-torchrun --nproc_per_node=8 main_end2end_v2s.py

@@ -64,6 +64,7 @@ def parse_args():
     return parser.parse_args()
 
 
+    
 class Config:
     """
     Parameters used for training
@@ -84,6 +85,8 @@ class Config:
     use_soft_mask = True
     use_shape_descript = False
     use_pl_masks = False
+    
+    use_ext_data = True
 
     # k-fold
     k = 4
@@ -93,15 +96,18 @@ class Config:
     # Model
     encoder_name = "tf_efficientnetv2_s"
     decoder_name = "Unet"
+    pretrained_weights = None
 
     use_lstm = False
     bidirectional = False
     use_cnn = False
     kernel_size = 0
     use_transfo = False
+    two_layers = False
 
-    pretrained_weights = None
-    reduce_stride = 1
+    reduce_stride = 2
+    upsample = False
+
     use_pixel_shuffle = False
     use_hypercolumns = False
     center = "none"
@@ -141,7 +147,7 @@ class Config:
         "weight_decay": 0.2,
     }
 
-    epochs = 40
+    epochs = 75
 
     two_stage = False
 
@@ -154,6 +160,7 @@ class Config:
     fullfit = False  # len(selected_folds) == 4
     n_fullfit = 1
 
+    
 
 class Config2:
     """
@@ -169,12 +176,14 @@ class Config2:
     # Data
     processed_folder = "false_color/"
     use_raw = True
-    frames = [0, 1, 2, 3, 4, 5, 6, 7]
+    frames = [1, 2, 3, 4]  # [2, 3, 4, 5]
     size = 256
     aug_strength = 3
     use_soft_mask = True
     use_shape_descript = False
     use_pl_masks = False
+    
+    use_ext_data = False
 
     # k-fold
     k = 4
@@ -184,13 +193,15 @@ class Config2:
     # Model
     encoder_name = "tf_efficientnetv2_s"
     decoder_name = "Unet"
-    reduce_stride = 1
+    reduce_stride = 2
+    upsample = False
 
-    use_lstm = True
+    use_lstm = False
     bidirectional = bool(np.max(frames) > 4)
-    use_cnn = False
+    use_cnn = True
     kernel_size = (1 if use_lstm else len(frames), 3, 3)
     use_transfo = False
+    two_layers = False
 
     pretrained_weights = None
 

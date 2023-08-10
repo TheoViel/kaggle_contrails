@@ -14,24 +14,6 @@ from util.logger import create_logger, save_config, prepare_log_folder, init_nep
 from params import DATA_PATH
 
 
-WEIGHTS = {
-    "tf_efficientnetv2_s":
-    {
-#         1: "../logs/2023-07-03/30/",
-#         2: "../logs/2023-07-03/35/",
-        2: "../logs/2023-07-30/6/"
-    },
-    "convnextv2_nano":
-    {
-#         2: "../logs/2023-07-05/35/",  # ref
-#         2: "../logs/2023-07-17/10/",
-        1: "../logs/2023-07-17/10/",
-#         2: "../logs/2023-07-18/0/",  # cnn pretrained
-        2: "../logs/2023-07-18/12/",  # cnn pretrained
-    },
-}
-
-
 def parse_args():
     """
     Parses arguments
@@ -80,14 +62,19 @@ def parse_args():
         default=0,
         help="Batch size",
     )
+    parser.add_argument(
+        "--weight-decay",
+        type=float,
+        default=0.,
+        help="Weight decay",
+    )
     return parser.parse_args()
 
-    
+   
 class Config:
     """
     Parameters used for training
     """
-
     # General
     seed = 42
     verbose = 1
@@ -109,10 +96,10 @@ class Config:
     # k-fold
     k = 4
     folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0]  # 1, 2, 3]  # [0]
+    selected_folds = []  # 1, 2, 3]  # [0]
 
     # Model
-    encoder_name = "tf_efficientnetv2_m"
+    encoder_name = "tf_efficientnetv2_s"
     decoder_name = "Unet"
     pretrained_weights = None
 
@@ -123,7 +110,7 @@ class Config:
     use_transfo = False
     two_layers = False
 
-    reduce_stride = 1
+    reduce_stride = 2
     upsample = False
 
     use_pixel_shuffle = False
@@ -165,7 +152,7 @@ class Config:
         "weight_decay": 0.2,
     }
 
-    epochs = 100
+    epochs = 200
 
     two_stage = False
 
@@ -175,104 +162,103 @@ class Config:
     verbose = 1
     verbose_eval = 200
 
-    fullfit = False  # len(selected_folds) == 4
-    n_fullfit = 1
+    fullfit = True  # len(selected_folds) == 4
+    n_fullfit = 2
 
+
+# class Config:
+#     """
+#     Parameters used for training
+#     """
+
+#     # General
+#     seed = 42
+#     verbose = 1
+#     device = "cuda"
+#     save_weights = True
+
+#     # Data
+#     processed_folder = "false_color/"
+#     use_raw = True
+#     frames = [2, 3, 4, 5]
+#     size = 256
+#     aug_strength = 3
+#     use_soft_mask = True
+#     use_shape_descript = False
+#     use_pl_masks = False
     
+#     use_ext_data = True
 
-class Config:
-    """
-    Parameters used for training
-    """
+#     # k-fold
+#     k = 4
+#     folds_file = f"../input/folds_{k}.csv"
+#     selected_folds = [0]  # 1, 2, 3]  # [0]
 
-    # General
-    seed = 42
-    verbose = 1
-    device = "cuda"
-    save_weights = True
+#     # Model
+#     encoder_name = "tf_efficientnetv2_s"
+#     decoder_name = "Unet"
+#     reduce_stride = 2
+#     upsample = False
 
-    # Data
-    processed_folder = "false_color/"
-    use_raw = True
-    frames = [2, 3, 4, 5]
-    size = 256
-    aug_strength = 3
-    use_soft_mask = True
-    use_shape_descript = False
-    use_pl_masks = False
-    
-    use_ext_data = False
+#     use_lstm = True
+#     bidirectional = bool(np.max(frames) > 4)
+#     use_cnn = False
+#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
+#     use_transfo = False
+#     two_layers = False
 
-    # k-fold
-    k = 4
-    folds_file = f"../input/folds_{k}.csv"
-    selected_folds = [0]  # 1, 2, 3]  # [0]
+#     pretrained_weights = "../logs/2023-07-29/1/"
 
-    # Model
-    encoder_name = "tf_efficientnetv2_s"
-    decoder_name = "Unet"
-    reduce_stride = 2
-    upsample = False
+#     use_pixel_shuffle = False
+#     use_hypercolumns = False
+#     center = "none"
+#     n_channels = 3
+#     num_classes = 7 if use_shape_descript else 1
 
-    use_lstm = True
-    bidirectional = bool(np.max(frames) > 4)
-    use_cnn = False
-    kernel_size = (1 if use_lstm else len(frames), 3, 3)
-    use_transfo = False
-    two_layers = False
+#     # Training
+#     loss_config = {
+#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
+#         "smoothing": 0.,
+#         "activation": "sigmoid",
+#         "aux_loss_weight": 0.,
+#         "activation_aux": "sigmoid",
+#         "ousm_k": 0,
+#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
+#         "shape_loss": "bce",
+#     }
 
-    pretrained_weights = "../logs/2023-07-30/6/"
+#     data_config = {
+#         "batch_size": 8 if reduce_stride == 1 else 4,
+#         "val_bs": 8,
+#         "mix": "cutmix",
+#         "mix_proba": 0.5,
+#         "mix_alpha": 5,
+#         "additive_mix": True,
+#         "num_classes": num_classes,
+#         "num_workers": 0 if use_shape_descript else 8,
+#     }
 
-    use_pixel_shuffle = False
-    use_hypercolumns = False
-    center = "none"
-    n_channels = 3
-    num_classes = 7 if use_shape_descript else 1
+#     optimizer_config = {
+#         "name": "AdamW",
+#         "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
+#         "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
+#         "warmup_prop": 0. if pretrained_weights is None else 0.1,
+#         "betas": (0.9, 0.999),
+#         "max_grad_norm": 1.0,
+#         "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
+#     }
 
-    # Training
-    loss_config = {
-        "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-        "smoothing": 0.,
-        "activation": "sigmoid",
-        "aux_loss_weight": 0.,
-        "activation_aux": "sigmoid",
-        "ousm_k": 0,
-        "shape_loss_w": 0.1 if use_shape_descript else 0.,
-        "shape_loss": "bce",
-    }
+#     epochs = 20 if data_config["batch_size"] == 4 else 20
+#     two_stage = False
 
-    data_config = {
-        "batch_size": 8 if reduce_stride == 1 else 4,
-        "val_bs": 8,
-        "mix": "cutmix",
-        "mix_proba": 0.5,
-        "mix_alpha": 5,
-        "additive_mix": True,
-        "num_classes": num_classes,
-        "num_workers": 0 if use_shape_descript else 8,
-    }
+#     use_fp16 = True
+#     model_soup = False
 
-    optimizer_config = {
-        "name": "AdamW",
-        "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
-        "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
-        "warmup_prop": 0. if pretrained_weights is None else 0.1,
-        "betas": (0.9, 0.999),
-        "max_grad_norm": 1.0,
-        "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
-    }
+#     verbose = 1
+#     verbose_eval = 200
 
-    epochs = 10 if data_config["batch_size"] == 4 else 20
-    two_stage = False
-
-    use_fp16 = True
-    model_soup = False
-
-    verbose = 1
-    verbose_eval = 200
-
-    fullfit = False  # len(selected_folds) == 4
-    n_fullfit = 1
+#     fullfit = False  # len(selected_folds) == 4
+#     n_fullfit = 1
 
 
     
@@ -315,6 +301,9 @@ if __name__ == "__main__":
 
     if args.lr:
         config.optimizer_config["lr"] = args.lr
+
+    if args.weight_decay:
+        config.optimizer_config["weight_decay"] = args.weight_decay
 
     if args.batch_size:
         config.data_config["batch_size"] = args.batch_size

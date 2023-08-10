@@ -43,6 +43,7 @@ class ContrailDataset(Dataset):
         use_pl_masks=False,
         frames=4,
         use_ext_data=False,
+        aug_strength=1,
     ):
         """
         Constructor.
@@ -72,8 +73,15 @@ class ContrailDataset(Dataset):
         
         self.ext_data_prop = 0
         if self.use_ext_data:
-            self.df_ext = pd.read_csv('../output/df_goes16_may.csv')
-            self.transfos_ext = get_transfos(strength=3, crop=True)
+            if isinstance(self.frames, list):
+#                 self.df_ext = pd.read_csv('../output/df_goes16_may_nocrop_2.csv')    
+                self.df_ext = pd.read_csv('../output/df_goes16_may_nocrop.csv')
+            else:
+                self.df_ext = pd.read_csv('../output/df_goes16_may.csv')
+            
+#             self.df_ext = pd.read_csv('../output/df_goes16_june-july.csv')
+#             self.df_ext = pd.read_csv('../output/df_goes16_june-july_2.csv')
+            self.transfos_ext = get_transfos(strength=aug_strength, crop=True)
             self.ext_data_prop = 0.5
 
     def __len__(self):
@@ -88,10 +96,21 @@ class ContrailDataset(Dataset):
     def _getitem_ext(self):
         idx = np.random.randint(len(self.df_ext))
 
-        img_path = self.df_ext['img_path'].values[idx]
-        mask_path = self.df_ext['mask_path'].values[idx]
+        if isinstance(self.frames, list):
+            idx = np.clip(idx, 4, len(self.df_ext) - 2)
+            
+            images = []
+            for frame in self.frames:
+                img_path = self.df_ext['img_path'].values[idx + frame - 4]
+#                 print(img_path)
+                images.append(cv2.imread(img_path))
+            image = np.concatenate(images, -1) # H x W x C*n_frames
+            
+        else:
+            img_path = self.df_ext['img_path'].values[idx]
+            image = cv2.imread(img_path)
         
-        image = cv2.imread(img_path)
+        mask_path = self.df_ext['mask_path'].values[idx]
         mask = np.load(mask_path).astype(np.float32)
 
         transformed = self.transfos_ext(image=image, mask=mask)
@@ -108,6 +127,9 @@ class ContrailDataset(Dataset):
             mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
             
         y = (mask.max() > 0.5).float().view(1)
+            
+        if image.size(0) > 3:
+            image = image.view(-1, 3, image.size(1), image.size(2)) # .transpose(0, 1)
             
         return image, mask, y
 
@@ -180,12 +202,12 @@ class ContrailDataset(Dataset):
         if image.size(0) > 3:
             image = image.view(3, -1, image.size(1), image.size(2)).transpose(0, 1)
 
-#         if image.size(1) > 256:  # Inf mode, this should be commented
-#             d = 16
-#             p1 = (d - image.size(1) % d) % d
-#             p2 = (d - image.size(2) % d) % d
-#             if p1 or p2:
-#                 image = torch.nn.functional.pad(image, (0, p1, 0, p2, 0, 0))
+        if image.size(1) > 256:  # Inf mode, this should be commented
+            d = 16
+            p1 = (d - image.size(1) % d) % d
+            p2 = (d - image.size(2) % d) % d
+            if p1 or p2:
+                image = torch.nn.functional.pad(image, (0, p1, 0, p2, 0, 0))
 
         return image, mask, y
 

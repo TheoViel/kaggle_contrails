@@ -93,7 +93,8 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0, cro
         albumentation transforms: Transforms for image augmentation.
     """
     resize_aug = [
-        CropNonEmptyMaskIfExists(resize[0], resize[1], always_apply=True)
+        CropNonEmptyMaskIfExists(resize[0], resize[1], always_apply=True),
+#         albu.RandomCrop(resize[0], resize[1], always_apply=True),
     ] if crop else []
 
     normalizer = albu.Compose(
@@ -110,8 +111,12 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0, cro
             augs = []
         elif strength == 1:
             augs = [
-                albu.HorizontalFlip(p=0.5),
-                albu.VerticalFlip(p=0.5),
+                albu.ShiftScaleRotate(
+                    scale_limit=0.2,
+                    shift_limit=0.2,
+                    rotate_limit=30,
+                    p=0.25,
+                ),
             ]
         elif strength == 2:
             augs = [
@@ -121,8 +126,8 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0, cro
                     rotate_limit=30,
                     p=0.5,
                 ),
-                color_transforms(p=0.5),
-                blur_transforms(p=0.25),
+                color_transforms(p=0.25),
+                blur_transforms(p=0.1),
             ]
         elif strength == 3:
             augs = [

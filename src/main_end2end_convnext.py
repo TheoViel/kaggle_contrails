@@ -106,7 +106,7 @@ class Config:
 
     pretrained_weights = None
     reduce_stride = 2
-    upsample = True
+    upsample = False
 
     use_pixel_shuffle = False
     use_hypercolumns = False
@@ -130,7 +130,7 @@ class Config:
         "batch_size": 8,
         "val_bs": 16,
         "mix": "cutmix",
-        "mix_proba": 0.5,
+        "mix_proba": 0.,
         "mix_alpha": 5,
         "additive_mix": True,
         "num_classes": num_classes,
@@ -160,96 +160,99 @@ class Config:
     n_fullfit = 1
 
 
-# class Config2:
-#     """
-#     Parameters used for training
-#     """
+class Config2:
+    """
+    Parameters used for training
+    """
 
-#     # General
-#     seed = 42
-#     verbose = 1
-#     device = "cuda"
-#     save_weights = True
+    # General
+    seed = 42
+    verbose = 1
+    device = "cuda"
+    save_weights = True
 
-#     # Data
-#     processed_folder = "false_color/"
-#     use_raw = True
-#     frames = [1, 2, 3, 4]  # [0, 1, 2, 3, 4, 5, 6, 7]
-#     size = 256
-#     aug_strength = 3
-#     use_soft_mask = True
-#     use_shape_descript = False  # True
-#     use_pl_masks = False
+    # Data
+    processed_folder = "false_color/"
+    use_raw = True
+    frames = [1, 2, 3, 4]  # [0, 1, 2, 3, 4, 5, 6, 7]
+    size = 256
+    aug_strength = 3
+    use_soft_mask = True
+    use_shape_descript = True  # True
+    use_pl_masks = False
+    two_layers = False
 
-#     # k-fold
-#     k = 4
-#     folds_file = f"../input/folds_{k}.csv"
-#     selected_folds = [0]  # 1, 2, 3]  # [0]
+    use_ext_data = False
 
-#     # Model
-#     encoder_name = "convnextv2_nano"
-#     decoder_name = "Unet"
-#     reduce_stride = 2
+    # k-fold
+    k = 4
+    folds_file = f"../input/folds_{k}.csv"
+    selected_folds = [0]  # 1, 2, 3]  # [0]
 
-#     use_lstm = False
-#     bidirectional = bool(np.max(frames) > 4)
-#     use_cnn = True
-#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
-#     use_transfo = False
-#     two_layers = True
+    # Model
+    encoder_name = "convnextv2_nano"
+    decoder_name = "Unet"
+    reduce_stride = 2
 
-#     pretrained_weights = "../logs/2023-07-18/4/"
+    use_lstm = False
+    bidirectional = bool(np.max(frames) > 4)
+    use_cnn = True
+    kernel_size = (1 if use_lstm else len(frames), 3, 3)
+    use_transfo = False
+    two_layers = False
 
-#     use_pixel_shuffle = False
-#     use_hypercolumns = False
-#     center = "none"
-#     n_channels = 3
-#     num_classes = 7 if use_shape_descript else 1
+    pretrained_weights = ""
 
-#     # Training
-#     loss_config = {
-#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-#         "smoothing": 0.,
-#         "activation": "sigmoid",
-#         "aux_loss_weight": 0.,
-#         "activation_aux": "sigmoid",
-#         "ousm_k": 0,
-#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
-#         "shape_loss": "bce",
-#     }
+    use_pixel_shuffle = False
+    use_hypercolumns = False
+    center = "none"
+    n_channels = 3
+    num_classes = 7 if use_shape_descript else 1
 
-#     data_config = {
-#         "batch_size": 8 if reduce_stride == 1 else 4,
-#         "val_bs": 8,
-#         "mix": "cutmix",
-#         "mix_proba": 0.5,
-#         "mix_alpha": 5,
-#         "additive_mix": True,
-#         "num_classes": num_classes,
-#         "num_workers": 0 if use_shape_descript else 8,
-#     }
+    # Training
+    loss_config = {
+        "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
+        "smoothing": 0.,
+        "activation": "sigmoid",
+        "aux_loss_weight": 0.,
+        "activation_aux": "sigmoid",
+        "ousm_k": 0,
+        "shape_loss_w": 0.1 if use_shape_descript else 0.,
+        "shape_loss": "bce",
+    }
 
-#     optimizer_config = {
-#         "name": "AdamW",
-#         "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
-#         "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
-#         "warmup_prop": 0. if pretrained_weights is None else 0.1,
-#         "betas": (0.9, 0.999),
-#         "max_grad_norm": 1.0,
-#         "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
-#     }
+    data_config = {
+        "batch_size": 8 if reduce_stride == 1 else 4,
+        "val_bs": 8,
+        "mix": "cutmix",
+        "mix_proba": 0.,
+        "mix_alpha": 5,
+        "additive_mix": True,
+        "num_classes": num_classes,
+        "num_workers": 0 if use_shape_descript else 8,
+    }
 
-#     epochs = 10 if data_config["batch_size"] == 4 else 20
-#     two_stage = False
+    optimizer_config = {
+        "name": "AdamW",
+        "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
+        "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
+        "warmup_prop": 0. if pretrained_weights is None else 0.1,
+        "betas": (0.9, 0.999),
+        "max_grad_norm": 1.0,
+        "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
+    }
 
-#     use_fp16 = True
-#     model_soup = False
+    epochs = 10 if data_config["batch_size"] == 4 else 20
+    two_stage = False
 
-#     verbose = 1
-#     verbose_eval = 200
+    use_fp16 = True
+    model_soup = False
 
-#     fullfit = False  # len(selected_folds) == 4
-#     n_fullfit = 1
+    verbose = 1
+    verbose_eval = 200
+
+    fullfit = False  # len(selected_folds) == 4
+    n_fullfit = 1
 
 
 if __name__ == "__main__":
@@ -333,42 +336,42 @@ if __name__ == "__main__":
 #     df = df.head(1000)
     k_fold(config, df, log_folder=log_folder, run=run)
 
-#     # -------- Stage 2 -------- #
+    # -------- Stage 2 -------- #
 
-#     # Update Config
-#     config2 = Config2
-#     config2.pretrained_weights = log_folder
-#     config2.seed = config.seed
-#     config2.world_size = config.world_size
-#     config2.rank = config.rank
-#     config2.local_rank = config.local_rank
-#     config2.device = config.device
-#     config2.distributed = config.distributed
-#     config = config2
+    # Update Config
+    config2 = Config2
+    config2.pretrained_weights = log_folder
+    config2.seed = config.seed
+    config2.world_size = config.world_size
+    config2.rank = config.rank
+    config2.local_rank = config.local_rank
+    config2.device = config.device
+    config2.distributed = config.distributed
+    config = config2
 
-#     # Logging
-#     if config.local_rank == 0:
-#         log_folder = prepare_log_folder(LOG_PATH)
-#         print(f'\n -> Logging results to {log_folder}\n')
+    # Logging
+    if config.local_rank == 0:
+        log_folder = prepare_log_folder(LOG_PATH)
+        print(f'\n -> Logging results to {log_folder}\n')
 
-#         print(f"\n- Frames  : {config.frames}")
-#         print(f"- LSTM    : {config.use_lstm}")
-#         print(f"- CNN     : {config.use_cnn}")
-#         print(f"- Transfo : {config.use_transfo}")
-#         print("\n -> 2.5D Fine-tuning\n")
+        print(f"\n- Frames  : {config.frames}")
+        print(f"- LSTM    : {config.use_lstm}")
+        print(f"- CNN     : {config.use_cnn}")
+        print(f"- Transfo : {config.use_transfo}")
+        print("\n -> 2.5D Fine-tuning\n")
 
-#         print(config.pretrained_weights)
+        print(config.pretrained_weights)
 
-#         run = init_neptune(config, log_folder)
-#         create_logger(directory=log_folder, name="logs.txt")
+        run = init_neptune(config, log_folder)
+        create_logger(directory=log_folder, name="logs.txt")
 
-#         save_config(config, log_folder + "config.json")
-#         run["global/config"].upload(log_folder + "config.json")
+        save_config(config, log_folder + "config.json")
+        run["global/config"].upload(log_folder + "config.json")
 
-#     # Train
-#     df = prepare_data(DATA_PATH, config.processed_folder, use_raw=config.use_raw)
+    # Train
+    df = prepare_data(DATA_PATH, config.processed_folder, use_raw=config.use_raw)
 
-#     k_fold(config, df, log_folder=log_folder, run=run)
+    k_fold(config, df, log_folder=log_folder, run=run)
 
     if config.local_rank == 0:
         print("\nDone !")
