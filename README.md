@@ -4,7 +4,7 @@
 
 ## Introduction - Adapted from [Kaggle](https://www.kaggle.com/competitions/google-research-identify-contrails-reduce-global-warming/discussion/430491)
 
-This repository contains Theo's part of the solution. 
+This repository contains Theo's part of the solution. Only the efficientet_v2-s trained with external data is used in the final solution, and achieves private LB 0.700 in a 10-seeds ensemble. Adding the 2.5D models (5x convnext-v2-nano + 5x v2-s) boosts the ensemble to 0.706 private.
 
 ![](contrails_v2s.png)
 
@@ -26,7 +26,7 @@ The model setup is schematically illustrated bellow. We process all input images
 
 ### Training
 
-EfficientNet models were trained with AdamW. Typical training takes ~30 epochs, or 100 epochs when using external data. Code for training convnext models is also provided. We used BCE + dice Lovasz loss. The latter contribution is a modification of standard Lovasz (symmetric one with elu+1) to approximate dice instead of IoU. This component is using global statistics to approximate global dice used in the competition. Lovasz loss made our predictions less susceptible to the threshold selection making the maximum of dice wider. Given the nosy nature of CV and LB, this property is quite important for stable CV and avoiding shakeups at private LB, even if we saw only a minor improvement at CV when added Lovasz term.
+EfficientNet models were trained with AdamW. Typical training takes ~30 epochs, and 100 or 200 epochs when using external data. Code for training convnext models is also provided. We used BCE + dice Lovasz loss. The latter contribution is a modification of standard Lovasz (symmetric one with elu+1) to approximate dice instead of IoU. This component is using global statistics to approximate global dice used in the competition. Lovasz loss made our predictions less susceptible to the threshold selection making the maximum of dice wider. Given the nosy nature of CV and LB, this property is quite important for stable CV and avoiding shakeups at private LB, even if we saw only a minor improvement at CV when added Lovasz term.
 
 
 ## How to use the repository
@@ -38,7 +38,7 @@ EfficientNet models were trained with AdamW. Typical training takes ~30 epochs, 
 - Download the data in the `input` folder:
   - [Competition data](https://www.kaggle.com/competitions/google-research-identify-contrails-reduce-global-warming/data)
 
-- Download the pseudo-labeled masks and images from GOES16 in the `output` folder:
+- (Optional) Download the pseudo-labeled masks and images from GOES16 in the `output` folder: 
   - [Images](https://www.kaggle.com/datasets/theoviel/contrails-goes16-img-1)
   - [Masks](https://www.kaggle.com/datasets/theoviel/contrails-goes16-mask-1)
 
@@ -58,23 +58,21 @@ output
 - Setup the environment :
   - `pip install -r requirements.txt`
 
-We also provide trained model weights :
+- We also provide trained model weights :
   - [2.5D Models](https://www.kaggle.com/datasets/theoviel/contrail-weights-v1)
   - [2D Models](https://www.kaggle.com/datasets/theoviel/contrail-weights-2d)
-
-
 
 
 ### Run The pipeline
 
 #### Preparation
 
-Preparation is done is the `notebooks/Preparation.ipynb` notebook. This will save the frame 4 in using the false_color scheme in png for faster training.
+Preparation is done is the `notebooks/Preparation.ipynb` notebook. This will save the frame 4 in png using the false_color scheme in png for faster 2D training.
 
 #### Training
 
-- `bash train.sh` will train the 2D models.
-- `bash train_end2end.sh` will train the 2D model and finetune it on 2.5D.
+- `bash train.sh` will train the 2D models. Downloading the external data is required.
+- `bash train_end2end.sh` will train the 2D model and finetune it on 2.5D. 
 
 #### Validation
 
@@ -82,7 +80,7 @@ Validation is done is the `notebooks/Validation.ipynb` notebook. Make sure to re
 
 #### Inference
 
-Inference is done on Kaggle, notebook is [here](https://www.kaggle.com/code/crodoc/benetech-mit-ensemble?scriptVersionId=134055662).
+Inference is done on Kaggle, notebook is [here](https://www.kaggle.com/code/theoviel/contrails-inference-comb).
 
 
 ### Code structure
