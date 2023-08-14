@@ -44,17 +44,33 @@ def define_model(
     verbose=0,
 ):
     """
-    Loads a segmentation architecture.
+    Define a segmentation model.
 
     Args:
-        decoder_name (str): Decoder name.
-        encoder_name (str): Encoder name.
-        num_classes (int, optional): Number of classes. Defaults to 1.
-        pretrained : pretrained original weights
-        encoder_weights (str, optional): Pretrained weights. Defaults to "imagenet".
+        decoder_name (str): Name of the decoder architecture.
+        encoder_name (str): Name of the encoder architecture.
+        num_classes (int, optional): Number of output classes. Defaults to 1.
+        encoder_weights (str, optional): Type of encoder weights to use. Defaults to "imagenet".
+        pretrained (bool, optional): Whether to use pretrained weights. Defaults to True.
+        n_channels (int, optional): Number of input channels. Defaults to 3.
+        pretrained_weights (str, optional): Path to pretrained weights file. Defaults to None.
+        reduce_stride (bool, optional): Whether to reduce the stride of the encoder. Defaults to False.
+        upsample (bool, optional): Whether to upsample images instead of stride reduction. Defaults to False.
+        use_pixel_shuffle (bool, optional): Whether to use pixel shuffle for upsampling. Defaults to False.
+        use_hypercolumns (bool, optional): Whether to use hypercolumns. Defaults to False.
+        center (str, optional): Center block, can be "std" or "aspp". Defaults to "none".
+        use_cls (bool, optional): Whether to use auxiliary classification head. Defaults to False.
+        frames (int, optional): Number of input frames. Defaults to 4.
+        use_lstm (bool, optional): Whether to use LSTM layer temporal mixing. Defaults to False.
+        bidirectional (bool, optional): Whether to use bidirectional LSTM. Defaults to False.
+        use_cnn (bool, optional): Whether to use CNN for temporal mixing. Defaults to False.
+        kernel_size (int, optional): Kernel size for auxiliary CNN. Defaults to 5.
+        use_transfo (bool, optional): Whether to use transformer for temporal mixing. Defaults to False.
+        two_layers (bool, optional): Whether to use two transformer layers. Defaults to False.
+        verbose (int, optional): Verbosity level. Defaults to 0.
 
     Returns:
-        torch model: Segmentation model.
+        nn.Module: Defined segmentation model.
     """
     assert decoder_name in DECODERS, "Decoder name not supported"
 
@@ -111,7 +127,7 @@ def define_model(
         use_transfo=use_transfo,
         two_layers=two_layers,
     )
-    
+
     model.upsample = 2 ** reduce_stride if upsample else 0
     model.reduce_stride(encoder_name, decoder_name, reduce_stride)
 
@@ -129,6 +145,30 @@ def define_model(
 
 
 class SegWrapper(nn.Module):
+    """
+    Wrapper module for segmentation models with optional auxiliary classification and transformation layers.
+
+    This class wraps a segmentation model and adds optional auxiliary classification or 3D layers,
+    such as LSTM, CNN, or transformer.
+    It supports reducing stride for certain encoders and decoding architectures.
+
+    Attributes:
+        model (nn.Module): The wrapped segmentation model.
+        num_classes (int): Number of output classes from the segmentation model.
+        use_cls (bool): Whether auxiliary classification is enabled.
+        use_lstm (bool): Whether LSTM is enabled.
+        use_cnn (bool): Whether CNN is enabled.
+        use_transfo (bool): Whether transformer is enabled.
+        frames (int or list/tuple): Input frames or frames to use.
+        two_layers (bool): Whether two temporal mixing layers are used.
+
+    Methods:
+        reduce_stride(encoder_name, decoder_name="Unet", reduce_stride=0):
+            Reduce stride for certain encoders and decoding architectures.
+        forward(x):
+            Forward pass through the wrapped model with optional auxiliary layers.
+
+    """
     def __init__(
         self,
         model,
@@ -143,13 +183,17 @@ class SegWrapper(nn.Module):
     ):
         """
         Constructor.
-        TODO
 
         Args:
-            encoder (timm model): Encoder.
-            num_classes (int, optional): Number of classes. Defaults to 1.
-            num_classes_aux (int, optional): Number of aux classes. Defaults to 0.
-            n_channels (int, optional): Number of image channels. Defaults to 3.
+            model (nn.Module): The segmentation model to wrap.
+            use_cls (bool, optional): Whether to use auxiliary classification head. Defaults to False.
+            frames (int or list/tuple, optional): Frame(s) to use. Defaults to 4.
+            use_lstm (bool, optional): Whether to use LSTM layer for temporal mixing. Defaults to False.
+            bidirectional (bool, optional): Whether to use bidirectional LSTM. Defaults to False.
+            use_cnn (bool, optional): Whether to use CNN for temporal mixing. Defaults to False.
+            kernel_size (int or tuple, optional): Kernel size for temporal mixing CNN. Defaults to 3.
+            use_transfo (bool, optional): Whether to use transformer for temporal mixing. Defaults to False.
+            two_layers (bool, optional): Whether to use two temporal mixing layers. Defaults to False.
         """
         super().__init__()
 
@@ -202,7 +246,9 @@ class SegWrapper(nn.Module):
                         model.encoder.out_channels[-2],
                         model.encoder.out_channels[-2],
                         kernel_size=kernel_size,
-                        padding=(kernel_size[0] // 2 if use_lstm else 0, kernel_size[1] // 2, kernel_size[2] // 2)
+                        padding=(
+                            kernel_size[0] // 2 if use_lstm else 0, kernel_size[1] // 2, kernel_size[2] // 2
+                        )
                     ),
                     nn.BatchNorm3d(model.encoder.out_channels[-2]),
                     nn.ReLU(),
@@ -214,6 +260,15 @@ class SegWrapper(nn.Module):
                 self.transfo_2 = Tmixer(model.encoder.out_channels[-2])
 
     def reduce_stride(self, encoder_name, decoder_name="Unet", reduce_stride=0):
+        """
+        Reduce stride for certain encoders and decoding architectures.
+        This improves the resolution of the model.
+
+        Args:
+            encoder_name (str): Name of the encoder architecture.
+            decoder_name (str, optional): Name of the decoder architecture. Defaults to "Unet".
+            reduce_stride (int, optional): Number of strides to reduce. Defaults to 0.
+        """
         if "nextvit" in encoder_name:
             return
 
@@ -224,7 +279,7 @@ class SegWrapper(nn.Module):
                     self.model.decoder.blocks[3].upscale = False
                     self.model.decoder.blocks[3].pixel_shuffle = nn.Identity()
             return
-        
+
         if reduce_stride == 0:
             return
 
@@ -236,7 +291,7 @@ class SegWrapper(nn.Module):
             elif "resnet" in encoder_name or "resnext" in encoder_name:
                 try:
                     self.model.encoder.model.conv1[0].stride = (1, 1)
-                except:
+                except Exception:
                     self.model.encoder.model.conv1.stride = (1, 1)
             elif "convnext" in encoder_name:
                 self.model.encoder.stem[0].stride = (2, 2)
@@ -285,14 +340,9 @@ class SegWrapper(nn.Module):
             n_frames = 1
 
         if self.upsample > 1:
-#             print(x.size())
             x = nn.functional.interpolate(x, scale_factor=self.upsample, mode="bilinear")
-#             print(x.size())
 
         features = self.model.encoder(x)
-        
-#         for ft in features:
-#             print(ft.size())
 
         if self.use_lstm or self.use_cnn or self.use_transfo:
             assert n_frames > 1, "Only one frame, cannot use LSTM / CNN"
@@ -300,19 +350,16 @@ class SegWrapper(nn.Module):
             frame_idx = self.frames.index(4)
 
             for i, ft in enumerate(features):
-#                 print(ft.size())
+                # print(ft.size())
 
                 if i != len(features) - 1:  # not last layer
                     if self.two_layers and (i == len(features) - 2):
-#                         print(i)
                         pass
                     else:
                         ft = ft.view(bs, n_frames, ft.size(1), ft.size(2), ft.size(3))[:, frame_idx]
                         features_.append(ft)
-#                         print(f'skip {i}')
                         continue
-                
-#                 print('2.5D !')
+
                 _, n_fts, h, w = ft.size()
                 ft = ft.view(bs, n_frames, n_fts, h, w)
 

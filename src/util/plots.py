@@ -81,7 +81,7 @@ def plot_sample(img, mask, figsize=(18, 6), n=3):
     plt.subplot(1, n, 1)
     plt.imshow(img)
     plt.axis(False)
-    
+
     if n == 3:
         plt.subplot(1, n, 2)
         plot_mask(img, mask)

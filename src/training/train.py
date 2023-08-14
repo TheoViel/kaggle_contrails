@@ -40,7 +40,7 @@ def evaluate(
 
     Returns:
         val_loss (float or int): Average validation loss.
-        dices (float or int): Dice scores.
+        dices (dict): Dice scores at different thresholds.
         acc (float or int): Accuracy score.
     """
     model.eval()
@@ -120,7 +120,6 @@ def fit(
     log_folder=None,
     run=None,
     fold=0,
-    resume_step=1,
 ):
     """
     Train the model.
@@ -142,10 +141,9 @@ def fit(
         log_folder (str, optional): Folder path for saving model weights. Defaults to None.
         run (neptune.Run, optional): Neptune run object for logging. Defaults to None.
         fold (int, optional): Fold number for tracking progress. Defaults to 0.
-        resume_step (int, optional): Current training step for resuming training. Defaults to 1.
 
     Returns:
-        preds (torch.Tensor or int): Predictions for the main task.
+        dices (dict): Dice scores at different thresholds.
     """
     scaler = torch.cuda.amp.GradScaler()
 
@@ -202,7 +200,7 @@ def fit(
                 0,
                 0.5
             )
-            
+
             train_loader, val_loader = define_loaders(
                 train_dataset,
                 val_dataset,
@@ -213,7 +211,7 @@ def fit(
                 world_size=world_size,
                 local_rank=local_rank,
             )
-            
+
         if distributed:
             try:
                 train_loader.sampler.set_epoch(epoch)
@@ -293,15 +291,15 @@ def fit(
                     print(s)
 
                 if run is not None:
-                    run[f"fold_{fold}/train/epoch"].log(epoch, step=step_ + resume_step)
-                    run[f"fold_{fold}/train/loss"].log(avg_loss, step=step_ + resume_step)
-                    run[f"fold_{fold}/train/lr"].log(lr, step=step_ + resume_step)
+                    run[f"fold_{fold}/train/epoch"].log(epoch, step=step_)
+                    run[f"fold_{fold}/train/loss"].log(avg_loss, step=step_)
+                    run[f"fold_{fold}/train/lr"].log(lr, step=step_)
                     if not np.isnan(avg_val_loss):
-                        run[f"fold_{fold}/val/loss"].log(avg_val_loss, step=step_ + resume_step)
-                    run[f"fold_{fold}/val/dice"].log(dice, step=step_ + resume_step)
-                    run[f"fold_{fold}/val/th"].log(th, step=step_ + resume_step)
-                    run[f"fold_{fold}/val/dice@.5"].log(dices[0.5], step=step_ + resume_step)
-                    run[f"fold_{fold}/val/acc"].log(acc, step=step_ + resume_step)
+                        run[f"fold_{fold}/val/loss"].log(avg_val_loss, step=step_)
+                    run[f"fold_{fold}/val/dice"].log(dice, step=step_)
+                    run[f"fold_{fold}/val/th"].log(th, step=step_)
+                    run[f"fold_{fold}/val/dice@.5"].log(dices[0.5], step=step_)
+                    run[f"fold_{fold}/val/acc"].log(acc, step=step_)
 
                 start_time = time.time()
                 avg_losses = []
@@ -314,4 +312,4 @@ def fit(
     if distributed:
         torch.distributed.barrier()
 
-    return dices, step_
+    return dices

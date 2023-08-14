@@ -64,7 +64,6 @@ def parse_args():
     return parser.parse_args()
 
 
-    
 class Config:
     """
     Parameters used for training
@@ -85,8 +84,8 @@ class Config:
     use_soft_mask = True
     use_shape_descript = False
     use_pl_masks = False
-    
-    use_ext_data = True
+
+    use_ext_data = False
 
     # k-fold
     k = 4
@@ -147,7 +146,7 @@ class Config:
         "weight_decay": 0.2,
     }
 
-    epochs = 75
+    epochs = 40
 
     two_stage = False
 
@@ -160,7 +159,6 @@ class Config:
     fullfit = False  # len(selected_folds) == 4
     n_fullfit = 1
 
-    
 
 class Config2:
     """
@@ -182,7 +180,7 @@ class Config2:
     use_soft_mask = True
     use_shape_descript = False
     use_pl_masks = False
-    
+
     use_ext_data = False
 
     # k-fold

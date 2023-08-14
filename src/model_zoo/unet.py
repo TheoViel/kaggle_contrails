@@ -1,6 +1,5 @@
 # Adapted from:
 # https://github.com/qubvel/segmentation_models.pytorch/blob/master/segmentation_models_pytorch/decoders/unet/decoder.py
-# TODO : Clean, update doc
 
 import timm
 import torch
@@ -17,13 +16,25 @@ from segmentation_models_pytorch.base import (
     SegmentationHead,
     ClassificationHead,
 )
-
 from model_zoo.aspp import ASPP
-import model_zoo.nextvit as nextvit
-from model_zoo.swin import swinv2_tiny_window16_256, swinv2_tiny_window8_256
 
 
 class DecoderBlock(nn.Module):
+    """
+    Decoder block module for U-Net style architectures.
+
+    This module represents a decoder block used in U-Net style architectures for semantic segmentation.
+    It consists of convolutional layers and optional attention mechanisms for feature refinement.
+    The block can perform upscaling of the input tensor.
+
+    Methods:
+        forward(x, skip=None, upscale=True):
+            Applies the decoder block to the input tensor.
+
+    Attributes:
+        upscale (bool): Whether to perform upscaling of the input tensor.
+        use_pixel_shuffle (bool): Whether to use pixel shuffle for upscaling.
+    """
     def __init__(
         self,
         in_channels,
@@ -34,6 +45,18 @@ class DecoderBlock(nn.Module):
         upscale=True,
         use_pixel_shuffle=False,
     ):
+        """
+        Constructor.
+
+        Args:
+            in_channels (int): Number of input channels.
+            skip_channels (int): Number of skip connection channels.
+            out_channels (int): Number of output channels.
+            use_batchnorm (bool, optional): Whether to use batch normalization. Defaults to True.
+            attention_type (str, optional): Type of attention mechanism to use. Defaults to None.
+            upscale (bool, optional): Whether to perform upscaling of the input tensor. Defaults to True.
+            use_pixel_shuffle (bool, optional): Whether to use pixel shuffle for upscaling. Defaults to False.
+        """
         super().__init__()
         self.upscale = upscale
         self.use_pixel_shuffle = use_pixel_shuffle
@@ -59,6 +82,17 @@ class DecoderBlock(nn.Module):
             self.pixel_shuffle = PixelShuffle_ICNR(in_channels, scale=2)
 
     def forward(self, x, skip=None, upscale=True):
+        """
+        Applies the decoder block to the input tensor.
+
+        Args:
+            x (torch tensor): Input tensor.
+            skip (torch tensor, optional): Skip connection tensor. Defaults to None.
+            upscale (bool, optional): Whether to perform upscaling of the input tensor. Defaults to True.
+
+        Returns:
+            torch tensor: Output tensor.
+        """
         if self.upscale and upscale:
             if self.use_pixel_shuffle:
                 x = self.pixel_shuffle(x)
@@ -74,7 +108,24 @@ class DecoderBlock(nn.Module):
 
 
 class CenterBlock(nn.Sequential):
+    """
+    Center block module for U-Net style architectures.
+
+    This module represents a center block used in U-Net style architectures for semantic segmentation.
+    It consists of consecutive convolutional layers.
+
+    Attributes:
+        Sequential: Inherits from nn.Sequential and contains convolutional layers.
+    """
     def __init__(self, in_channels, out_channels, use_batchnorm=True):
+        """
+        Constructor.
+
+        Args:
+            in_channels (int): Number of input channels.
+            out_channels (int): Number of output channels.
+            use_batchnorm (bool, optional): Whether to use batch normalization. Defaults to True.
+        """
         conv1 = md.Conv2dReLU(
             in_channels,
             out_channels,
@@ -93,6 +144,19 @@ class CenterBlock(nn.Sequential):
 
 
 class UnetDecoder(nn.Module):
+    """
+    Decoder module for U-Net style architectures.
+
+    This module represents the decoder part of a U-Net style architecture used for semantic segmentation.
+    It combines skip connections from the encoder with the main pathway
+    to produce the final segmentation output.
+
+    Attributes:
+        center (nn.Module): The center block module.
+        blocks (nn.ModuleList): List of decoder blocks.
+        hypercolumns_conv (nn.Sequential): Convolutional layers for hypercolumns if enabled.
+        use_hypercolumns (bool): Whether hypercolumns are used.
+    """
     def __init__(
         self,
         encoder_channels,
@@ -104,6 +168,19 @@ class UnetDecoder(nn.Module):
         use_pixel_shuffle=False,
         use_hypercolumns=False,
     ):
+        """
+        Constructor.
+
+        Args:
+            encoder_channels (list): List of channel dimensions of the encoder's output feature maps.
+            decoder_channels (list): List of channel dimensions for each block in the decoder.
+            n_blocks (int): Number of blocks in the decoder. Defaults to 5.
+            use_batchnorm (bool, optional): Whether to use batch normalization. Defaults to True.
+            attention_type (str, optional): Type of attention mechanism to use. Defaults to None.
+            center (str, optional): Center block. Value can be 'std', 'aspp', or None. Defaults to None.
+            use_pixel_shuffle (bool, optional): Whether to use pixel shuffle for upscaling. Defaults to False.
+            use_hypercolumns (bool, optional): Whether to use hypercolumns. Defaults to False.
+        """
         super().__init__()
 
         self.use_hypercolumns = use_hypercolumns
@@ -155,12 +232,18 @@ class UnetDecoder(nn.Module):
             )
 
     def forward(self, *features):
+        """
+        Forward pass of the decoder module.
+
+        Args:
+            *features (list of torch.Tensor): Encoder's output feature maps, where each tensor corresponds
+                to a different resolution level.
+
+        Returns:
+            torch.Tensor: Segmentation output tensor.
+        """
         features = features[1:]  # remove first skip with same spatial resolution
         features = features[::-1]  # reverse channels to start from head of encoder
-
-#         for ft in features:
-#             print(ft.size())
-#         print()
 
         head = features[0]
         skips = features[1:]
@@ -171,7 +254,6 @@ class UnetDecoder(nn.Module):
         for i, decoder_block in enumerate(self.blocks):
             skip = skips[i] if i < len(skips) else None
 
-#             print(i, x.size(), skip.size() if skip is not None else None)
             x = decoder_block(x, skip)
             xs.append(x)
 
@@ -190,6 +272,15 @@ class UnetDecoder(nn.Module):
 
 
 def convnext_forward_features(self, x):
+    """
+    Forward pass through the ConvNeXt backbone to extract features.
+
+    Args:
+        x (torch.Tensor): Input tensor.
+
+    Returns:
+        list of torch.Tensor: List of feature maps from different stages of the ConvNeXt backbone.
+    """
     fts = [x]
     x = self.stem(x)
 
@@ -204,48 +295,15 @@ def convnext_forward_features(self, x):
 
 
 class Unet(SegmentationModel):
-    """Unet_ is a fully convolution neural network for image semantic segmentation. Consist of *encoder*
-    and *decoder* parts connected with *skip connections*. Encoder extract features of different spatial
-    resolution (skip connections) which are used by decoder to define accurate segmentation mask.
-    Use *concatenation* for fusing decoder blocks with skip connections.
+    """
+    UNet-like architecture for image segmentation.
 
-    Args:
-        encoder_name: Name of the classification model that will be used as an encoder (a.k.a backbone)
-            to extract features of different spatial resolution
-        encoder_depth: A number of stages used in encoder in range [3, 5]. Each stage generate features
-            two times smaller in spatial dimensions than previous one (e.g. for depth 0 we will have features
-            with shapes [(N, C, H, W),], for depth 1 - [(N, C, H, W), (N, C, H // 2, W // 2)] and so on).
-            Default is 5
-        encoder_weights: One of **None** (random initialization), **"imagenet"** (pre-training on ImageNet)
-            and other pretrained weights (see table with available weights for each encoder_name)
-        decoder_channels: List of integers which specify **in_channels** parameter for decoder convolutions.
-            Length of the list should be the same as **encoder_depth**
-        decoder_use_batchnorm: If **True**, BatchNorm2d layer between Conv2D and Activation layers
-            is used. If **"inplace"** InplaceABN will be used, allows to decrease memory consumption.
-            Available options are **True, False, "inplace"**
-        decoder_attention_type: Attention module used in decoder of the model. Available options are
-            **None** and **scse** (https://arxiv.org/abs/1808.08127).
-        in_channels: A number of input channels for the model, default is 3 (RGB images)
-        classes: A number of classes for output mask (or you can think as a number of channels of output mask)
-        activation: An activation function to apply after the final convolution layer.
-            Available options are **"sigmoid"**, **"softmax"**, **"logsoftmax"**, **"tanh"**, **"identity"**,
-                **callable** and **None**.
-            Default is **None**
-        aux_params: Dictionary with parameters of the auxiliary output (classification head).
-            Auxiliary output is build on top of encoder if **aux_params** is not **None** (default).
-            Supported params:
-                - classes (int): A number of classes
-                - pooling (str): One of "max", "avg". Default is "avg"
-                - dropout (float): Dropout factor in [0, 1)
-                - activation (str): An activation function to apply "sigmoid"/"softmax"
-                    (could be **None** to return logits)
-
-    Returns:
-        ``torch.nn.Module``: Unet
-
-    .. _Unet:
-        https://arxiv.org/abs/1505.04597
-
+    Attributes:
+        encoder: The encoder architecture.
+        decoder: The decoder architecture.
+        segmentation_head: Head for segmentation output.
+        classification_head: Head for auxiliary classification output.
+        name (str): Model name.
     """
 
     def __init__(
@@ -265,14 +323,28 @@ class Unet(SegmentationModel):
         use_lstm=False,
         center="none",
     ):
+        """
+        Constructor.
+
+        Args:
+            encoder_name (str): Name of the encoder architecture.
+            encoder_depth (int): Depth of the encoder.
+            encoder_weights (str, optional): Pretrained weights for the encoder. Default is "imagenet".
+            decoder_use_batchnorm (bool): Whether to use batch normalization in the decoder. Default is True.
+            decoder_channels (List[int]): Number of channels for each decoder block.
+            decoder_attention_type (str, optional): Attention mechanism type in the decoder. Default is None.
+            in_channels (int): Number of input channels. Default is 3.
+            classes (int): Number of output classes. Default is 1.
+            activation (str or callable, optional): Activation function to use. Default is None.
+            aux_params (dict, optional): Auxiliary classification head parameters. Default is None.
+            use_pixel_shuffle (bool): Whether to use pixel shuffle in the decoder blocks. Default is False.
+            use_hypercolumns (bool): Whether to use hypercolumns for feature fusion. Default is False.
+            use_lstm (bool): Whether to use LSTM for temporal feature aggregation. Default is False.
+            center (str): Type of center block. Default is "none".
+        """
         super().__init__()
 
-        if "nextvit" in encoder_name:
-            assert in_channels == 3
-            self.encoder = getattr(nextvit, encoder_name[3:])(pretrained=encoder_weights)
-            encoder_depth = 4
-            decoder_channels = decoder_channels[:encoder_depth]
-        elif "convnext" in encoder_name:
+        if "convnext" in encoder_name:
             self.encoder = timm.create_model(encoder_name[3:] + ".fcmae", pretrained=encoder_weights)
             self.encoder.head = nn.Identity()
             self.encoder.forward = lambda x: convnext_forward_features(self.encoder, x)
@@ -288,25 +360,6 @@ class Unet(SegmentationModel):
             self.encoder.output_stride = 32
             encoder_depth = 4
             decoder_channels = decoder_channels[:encoder_depth]
-        elif "swinv2" in encoder_name:
-            # Stride is automatically reduced swinv2_tiny_window8_256
-            if "tiny_window16_256" in encoder_name:
-                self.encoder = swinv2_tiny_window16_256(pretrained=encoder_weights)
-                self.encoder.out_channels = [3, 96, 192, 384, 768]
-            elif "tiny_window8_256" in encoder_name:
-                self.encoder = swinv2_tiny_window8_256(pretrained=encoder_weights)
-                self.encoder.out_channels = [3, 96, 192, 384, 768]
-            else:
-                raise NotImplementedError
-            self.encoder.head = nn.Identity()
-            self.encoder.norm = nn.Identity()
-
-            self.encoder.patch_embed.proj.stride = (1, 1)
-            self.encoder.patch_embed.proj.padding = (1, 1)
-            self.encoder.output_stride = 32
-            encoder_depth = 4
-            decoder_channels = decoder_channels[:encoder_depth]
-            
         else:
             self.encoder = get_encoder(
                 encoder_name,

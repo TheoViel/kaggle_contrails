@@ -3,13 +3,11 @@ import time
 import torch
 import warnings
 import argparse
-import numpy as np
 import pandas as pd
 
 from data.preparation import prepare_data
 from util.torch import init_distributed
 from util.logger import create_logger, save_config, prepare_log_folder, init_neptune
-# from util.gpu_affinity import set_affinity
 
 from params import DATA_PATH
 
@@ -70,7 +68,7 @@ def parse_args():
     )
     return parser.parse_args()
 
-   
+
 class Config:
     """
     Parameters used for training
@@ -90,7 +88,7 @@ class Config:
     use_soft_mask = True
     use_shape_descript = False
     use_pl_masks = False
-    
+
     use_ext_data = True
 
     # k-fold
@@ -152,7 +150,7 @@ class Config:
         "weight_decay": 0.2,
     }
 
-    epochs = 200
+    epochs = 100
 
     two_stage = False
 
@@ -162,117 +160,15 @@ class Config:
     verbose = 1
     verbose_eval = 200
 
-    fullfit = True  # len(selected_folds) == 4
-    n_fullfit = 2
+    fullfit = False
+    n_fullfit = 5
 
 
-# class Config:
-#     """
-#     Parameters used for training
-#     """
-
-#     # General
-#     seed = 42
-#     verbose = 1
-#     device = "cuda"
-#     save_weights = True
-
-#     # Data
-#     processed_folder = "false_color/"
-#     use_raw = True
-#     frames = [2, 3, 4, 5]
-#     size = 256
-#     aug_strength = 3
-#     use_soft_mask = True
-#     use_shape_descript = False
-#     use_pl_masks = False
-    
-#     use_ext_data = True
-
-#     # k-fold
-#     k = 4
-#     folds_file = f"../input/folds_{k}.csv"
-#     selected_folds = [0]  # 1, 2, 3]  # [0]
-
-#     # Model
-#     encoder_name = "tf_efficientnetv2_s"
-#     decoder_name = "Unet"
-#     reduce_stride = 2
-#     upsample = False
-
-#     use_lstm = True
-#     bidirectional = bool(np.max(frames) > 4)
-#     use_cnn = False
-#     kernel_size = (1 if use_lstm else len(frames), 3, 3)
-#     use_transfo = False
-#     two_layers = False
-
-#     pretrained_weights = "../logs/2023-07-29/1/"
-
-#     use_pixel_shuffle = False
-#     use_hypercolumns = False
-#     center = "none"
-#     n_channels = 3
-#     num_classes = 7 if use_shape_descript else 1
-
-#     # Training
-#     loss_config = {
-#         "name": "lovasz_bce",  # bce lovasz_focal lovasz focal
-#         "smoothing": 0.,
-#         "activation": "sigmoid",
-#         "aux_loss_weight": 0.,
-#         "activation_aux": "sigmoid",
-#         "ousm_k": 0,
-#         "shape_loss_w": 0.1 if use_shape_descript else 0.,
-#         "shape_loss": "bce",
-#     }
-
-#     data_config = {
-#         "batch_size": 8 if reduce_stride == 1 else 4,
-#         "val_bs": 8,
-#         "mix": "cutmix",
-#         "mix_proba": 0.5,
-#         "mix_alpha": 5,
-#         "additive_mix": True,
-#         "num_classes": num_classes,
-#         "num_workers": 0 if use_shape_descript else 8,
-#     }
-
-#     optimizer_config = {
-#         "name": "AdamW",
-#         "lr": 1e-4 if data_config["batch_size"] == 4 else 3e-4,
-#         "lr_encoder": 3e-5 if data_config["batch_size"] == 4 else 1e-4,
-#         "warmup_prop": 0. if pretrained_weights is None else 0.1,
-#         "betas": (0.9, 0.999),
-#         "max_grad_norm": 1.0,
-#         "weight_decay": 0.2 if encoder_name == "tf_efficientnetv2_s" else 0.05,
-#     }
-
-#     epochs = 20 if data_config["batch_size"] == 4 else 20
-#     two_stage = False
-
-#     use_fp16 = True
-#     model_soup = False
-
-#     verbose = 1
-#     verbose_eval = 200
-
-#     fullfit = False  # len(selected_folds) == 4
-#     n_fullfit = 1
-
-
-    
 if __name__ == "__main__":
     warnings.simplefilter("ignore", UserWarning)
 
     config = Config
     init_distributed(config)
-
-    #  ['socket', 'single', 'single_unique', 'socket_unique_interleaved', 'socket_unique_continuous', 'disabled']
-    # affinity = set_affinity(
-    #     config.local_rank, torch.cuda.device_count(), "socket_unique_interleaved"
-    # )
-    # print(f'{config.local_rank}: thread affinity: {sorted(list(affinity))}')
 
     if config.local_rank == 0:
         print("\nStarting !")

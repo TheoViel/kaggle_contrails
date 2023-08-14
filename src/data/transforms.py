@@ -5,6 +5,11 @@ from albumentations.pytorch import ToTensorV2
 
 
 class CropNonEmptyMaskIfExists(albu.CropNonEmptyMaskIfExists):
+    """
+    Modified class from:
+    https://github.com/albumentations-team/albumentations/blob/master/albumentations/augmentations/crops/transforms.py#L163
+    to allow for soft masks.
+    """
     def update_params(self, params, **kwargs):
         super().update_params(params, **kwargs)
 
@@ -88,13 +93,13 @@ def get_transfos(augment=True, resize=(256, 256), mean=0, std=1, strength=0, cro
         mean (np array, optional): Mean for normalization. Defaults to 0.
         std (np array, optional): Standard deviation for normalization. Defaults to 1.
         strength (int, optional): Strength level for augmentations. Defaults to 1.
+        crop (bool, optional): Whether to apply CropNonEmptyMaskIfExists. Defaults to False.
 
     Returns:
         albumentation transforms: Transforms for image augmentation.
     """
     resize_aug = [
         CropNonEmptyMaskIfExists(resize[0], resize[1], always_apply=True),
-#         albu.RandomCrop(resize[0], resize[1], always_apply=True),
     ] if crop else []
 
     normalizer = albu.Compose(

@@ -85,7 +85,7 @@ class Config:
     use_soft_mask = True
     use_shape_descript = True
     use_pl_masks = False
-    
+
     use_ext_data = False
 
     # k-fold

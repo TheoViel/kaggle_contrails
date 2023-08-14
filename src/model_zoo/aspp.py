@@ -4,7 +4,29 @@ import torch.nn.functional as F
 
 
 class _ASPPModule(nn.Module):
+    """
+    Atrous Spatial Pyramid Pooling (ASPP) module.
+    This module performs atrous convolution with different dilation rates
+    to capture multi-scale contextual information.
+
+    Methods:
+        forward(x):
+            Forward pass through the ASPP module.
+
+        _init_weight():
+            Initialize the weights of the module's layers.
+    """
     def __init__(self, inplanes, planes, kernel_size, padding, dilation):
+        """
+        Constructor.
+
+        Args:
+            inplanes (int): Number of input channels.
+            planes (int): Number of output channels.
+            kernel_size (int): Size of the convolutional kernel.
+            padding (int): Padding applied to the input.
+            dilation (int): Dilation rate for the atrous convolution.
+        """
         super().__init__()
         self.atrous_conv = nn.Conv2d(inplanes, planes, kernel_size=kernel_size,
                                      stride=1, padding=padding, dilation=dilation, bias=False)
@@ -14,12 +36,25 @@ class _ASPPModule(nn.Module):
         self._init_weight()
 
     def forward(self, x):
+        """
+        Forward pass through the ASPP module.
+
+        Args:
+            x (torch tensor): Input tensor.
+
+        Returns:
+            torch tensor: Output tensor after atrous convolution and batch normalization.
+        """
         x = self.atrous_conv(x)
         x = self.bn(x)
 
         return self.relu(x)
 
     def _init_weight(self):
+        """
+        Initialize the weights of the module's layers.
+        This method is used to initialize the weights of the convolutional and batch normalization layers.
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.kaiming_normal_(m.weight)
@@ -29,7 +64,33 @@ class _ASPPModule(nn.Module):
 
 
 class ASPP(nn.Module):
+    """
+    Atrous Spatial Pyramid Pooling (ASPP) module.
+
+    This module implements Atrous Spatial Pyramid Pooling,
+    which uses atrous convolutions with multiple dilation rates to capture multi-scale contextual information.
+
+    Args:
+        inplanes (int, optional): Number of input channels. Defaults to 512.
+        mid_c (int, optional): Number of intermediate channels. Defaults to 256.
+        dilations (list, optional): Dilation rates for atrous convolutions. Defaults to [1, 6, 12, 18].
+
+    Methods:
+        forward(x):
+            Forward pass through the ASPP module.
+
+        _init_weight():
+            Initialize the weights of the module's layers.
+    """
     def __init__(self, inplanes=512, mid_c=256, dilations=[1, 6, 12, 18]):
+        """
+        Constructor.
+
+        Args:
+            inplanes (int, optional): Number of input channels. Defaults to 512.
+            mid_c (int, optional): Number of intermediate channels. Defaults to 256.
+            dilations (list, optional): Dilation rates for atrous convolutions. Defaults to [1, 6, 12, 18].
+        """
         super().__init__()
         self.aspp1 = _ASPPModule(inplanes, mid_c, 1, padding=0, dilation=dilations[0])
         self.aspp2 = _ASPPModule(inplanes, mid_c, 3, padding=dilations[1], dilation=dilations[1])
@@ -50,6 +111,15 @@ class ASPP(nn.Module):
         self._init_weight()
 
     def forward(self, x):
+        """
+        Forward pass through the ASPP module.
+
+        Args:
+            x (torch tensor): Input tensor.
+
+        Returns:
+            torch tensor: Output tensor after ASPP operations.
+        """
         x1 = self.aspp1(x)
         x2 = self.aspp2(x)
         x3 = self.aspp3(x)
@@ -66,6 +136,10 @@ class ASPP(nn.Module):
         return self.dropout(x)
 
     def _init_weight(self):
+        """
+        Initialize the weights of the module's layers.
+        This method is used to initialize the weights of the convolutional and batch normalization layers.
+        """
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 torch.nn.init.kaiming_normal_(m.weight)

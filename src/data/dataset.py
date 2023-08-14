@@ -1,5 +1,4 @@
 import os
-import re
 import cv2
 import torch
 import numpy as np
@@ -12,12 +11,13 @@ from data.preparation import load_record, get_false_color_img
 
 class ContrailDataset(Dataset):
     """
-    Custom dataset for contrail data.
+    Custom dataset for Contrail data.
 
     Methods:
         __init__(df, transforms, use_soft_mask, use_shape_descript, use_pl_masks, frames):
             Constructor for the dataset.
         __len__(): Get the length of the dataset.
+        _getitem_ext(): Sample a random item from the external dataset.
         __getitem__(idx): Get an item from the dataset.
 
     Attributes:
@@ -32,6 +32,10 @@ class ContrailDataset(Dataset):
         folders (numpy array): Array of folder paths for the images.
         ids (numpy array): Array of record IDs for the images.
         targets (numpy array): Array of target labels indicating the presence of contrails.
+        use_ext_data (bool): Whether to use external data instead.
+        ext_data_prop (float): Probability to sample external data with.
+        df (pandas DataFrame): Metadata containing information about the external dataset.
+        transfos_ext (albumentation transforms): Transforms to apply to the ext images and masks.
     """
 
     def __init__(
@@ -50,11 +54,13 @@ class ContrailDataset(Dataset):
 
         Args:
             df (pandas DataFrame): Metadata containing information about the dataset.
-            transforms (albumentation transforms, optional): Transforms to apply to the images and masks. Defaults to None.
-            use_soft_mask (bool, optional): Flag indicating whether to use the soft mask or not. Defaults to False.
-            use_shape_descript (bool, optional): Flag indicating whether to use shape descriptors. Defaults to False.
-            use_pl_masks (bool, optional): Flag indicating whether to use pseudo-label masks. Defaults to False.
+            transforms (albu transforms, optional): Transforms to apply to images and masks. Defaults to None.
+            use_soft_mask (bool, optional): Whether to use the soft mask or not. Defaults to False.
+            use_shape_descript (bool, optional): Whether to use shape descriptors. Defaults to False.
+            use_pl_masks (bool, optional): Whether to use pseudo-label masks. Defaults to False.
             frames (int or list, optional): Frame(s) to use for the false-color image. Defaults to 4.
+            use_ext_data (bool, optional): Whether to use external data. Defaults to False.
+            aug_strength (int, optional): Augmentation strength for external data. Defaults to 1.
         """
         self.df = df
         self.transforms = transforms
@@ -70,17 +76,14 @@ class ContrailDataset(Dataset):
         self.ids = df["record_id"].values
 
         self.targets = df["has_contrail"].values
-        
+
         self.ext_data_prop = 0
         if self.use_ext_data:
             if isinstance(self.frames, list):
-#                 self.df_ext = pd.read_csv('../output/df_goes16_may_nocrop_2.csv')    
-                self.df_ext = pd.read_csv('../output/df_goes16_may_nocrop.csv')
+                self.df_ext = pd.read_csv("../output/df_goes16_may_nocrop.csv")
             else:
-                self.df_ext = pd.read_csv('../output/df_goes16_may.csv')
-            
-#             self.df_ext = pd.read_csv('../output/df_goes16_june-july.csv')
-#             self.df_ext = pd.read_csv('../output/df_goes16_june-july_2.csv')
+                self.df_ext = pd.read_csv("../output/df_goes16_may.csv")
+
             self.transfos_ext = get_transfos(strength=aug_strength, crop=True)
             self.ext_data_prop = 0.5
 
@@ -92,45 +95,56 @@ class ContrailDataset(Dataset):
             int: Length of the dataset.
         """
         return len(self.img_paths)
-    
+
     def _getitem_ext(self):
+        """
+        Sample a random item from the external dataset.
+
+        Returns:
+            torch.Tensor: Image as a tensor of shape [C, H, W].
+            torch.Tensor: Mask as a tensor of shape [1 or 7, H, W].
+            torch.Tensor: Label as a tensor of shape [1].
+        """
         idx = np.random.randint(len(self.df_ext))
 
         if isinstance(self.frames, list):
             idx = np.clip(idx, 4, len(self.df_ext) - 2)
-            
+
             images = []
             for frame in self.frames:
-                img_path = self.df_ext['img_path'].values[idx + frame - 4]
-#                 print(img_path)
+                img_path = self.df_ext["img_path"].values[idx + frame - 4]
                 images.append(cv2.imread(img_path))
-            image = np.concatenate(images, -1) # H x W x C*n_frames
-            
+            image = np.concatenate(images, -1)  # H x W x C*n_frames
+
         else:
-            img_path = self.df_ext['img_path'].values[idx]
+            img_path = self.df_ext["img_path"].values[idx]
             image = cv2.imread(img_path)
-        
-        mask_path = self.df_ext['mask_path'].values[idx]
+
+        mask_path = self.df_ext["mask_path"].values[idx]
         mask = np.load(mask_path).astype(np.float32)
 
         transformed = self.transfos_ext(image=image, mask=mask)
         image = transformed["image"]
         mask = transformed["mask"].unsqueeze(0).float()
-        
+
         if self.use_shape_descript:
             from data.shape_descript import get_shape_descript
+
             shape_descript = get_shape_descript(
-                segmentation=(mask[0].numpy() > 0.5), sigma=(10, 10), voxel_size=(1, 1), downsample=2
+                segmentation=(mask[0].numpy() > 0.5),
+                sigma=(10, 10),
+                voxel_size=(1, 1),
+                downsample=2,
             )
             shape_descript[-1] *= 4
             shape_descript = np.clip(shape_descript, 0, 1)
             mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
-            
+
         y = (mask.max() > 0.5).float().view(1)
-            
+
         if image.size(0) > 3:
-            image = image.view(-1, 3, image.size(1), image.size(2)) # .transpose(0, 1)
-            
+            image = image.view(-1, 3, image.size(1), image.size(2))  # .transpose(0, 1)
+
         return image, mask, y
 
     def __getitem__(self, idx):
@@ -147,19 +161,19 @@ class ContrailDataset(Dataset):
         """
         if np.random.random() < self.ext_data_prop:
             return self._getitem_ext()
-        
+
         path = self.img_paths[idx]
 
-        if path.endswith('.png'):
+        if path.endswith(".png"):
             assert self.frames == 4
             image = cv2.imread(path)
         else:
             bands, _ = load_record(path, folder="", load_mask=False)
             false_color = get_false_color_img(bands)
-            
+
             if isinstance(self.frames, int):
                 image = false_color[..., self.frames]
-            else: # list, tuple
+            else:  # list, tuple
                 image = false_color[..., np.array(self.frames)]
                 image = image.reshape(image.shape[0], image.shape[1], -1)
 
@@ -171,12 +185,12 @@ class ContrailDataset(Dataset):
                 mask = np.load(indiv_masks_path).mean(-1).squeeze(-1)
             else:
                 mask = cv2.imread(self.mask_paths[idx], 0)
-                
+
             if self.use_pl_masks:
-                mask_pl = np.load(f'../logs/2023-07-06/23/pl_masks/{self.ids[idx]}.npy')
+                mask_pl = np.load(f"../logs/2023-07-06/23/pl_masks/{self.ids[idx]}.npy")
                 mask = (mask + mask_pl.astype(np.float32)) / 2
         else:
-            if self.mask_paths[idx].endswith('.npy'):
+            if self.mask_paths[idx].endswith(".npy"):
                 mask = np.load(self.mask_paths[idx]).astype(np.float32)
             else:
                 mask = cv2.imread(self.mask_paths[idx], 0)
@@ -185,20 +199,24 @@ class ContrailDataset(Dataset):
             transformed = self.transforms(image=image, mask=mask)
             image = transformed["image"]
             mask = transformed["mask"]
-            
+
         mask = mask.unsqueeze(0).float()  # H x W x 1
-        
+
         if self.use_shape_descript:
             from data.shape_descript import get_shape_descript
+
             shape_descript = get_shape_descript(
-                segmentation=(mask[0].numpy() > 0.5), sigma=(10, 10), voxel_size=(1, 1), downsample=2
+                segmentation=(mask[0].numpy() > 0.5),
+                sigma=(10, 10),
+                voxel_size=(1, 1),
+                downsample=2,
             )
             shape_descript[-1] *= 4
             shape_descript = np.clip(shape_descript, 0, 1)
             mask = torch.cat([mask, torch.from_numpy(shape_descript)], 0)
 
         y = torch.tensor([self.targets[idx]], dtype=torch.float)
-        
+
         if image.size(0) > 3:
             image = image.view(3, -1, image.size(1), image.size(2)).transpose(0, 1)
 
@@ -239,7 +257,7 @@ class ContrailInfDataset(Dataset):
         Args:
             folders (list): List of paths to the folders containing data for inference
             transforms (albumentation transforms, optional): Transforms to apply. Defaults to None.
-            frames (int or list or tuple, optional): Frame indices or indices range to extract from false color images. Defaults to 4.
+            frames (int or list or tuple, optional): Frame indices or indices range to use. Defaults to 4.
         """
         self.folders = folders
         self.transforms = transforms
@@ -278,14 +296,14 @@ class ContrailInfDataset(Dataset):
         image = (image * 255).astype(np.uint8)
 
         try:
-            mask = masks['human_pixel_masks']
+            mask = masks["human_pixel_masks"]
         except KeyError:
             mask = 0
 
         if self.transforms:
             transformed = self.transforms(image=image)
             image = transformed["image"]
-            
+
         if isinstance(image, torch.Tensor):
             if image.size(0) > 3:
                 image = image.view(3, -1, image.size(1), image.size(2)).transpose(0, 1)

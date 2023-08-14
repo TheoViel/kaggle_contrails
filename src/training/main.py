@@ -31,15 +31,13 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
     Returns:
         dict: Dice scores at different thresholds.
     """
-    df_train_ = df_train[df_train['has_contrail']] if config.two_stage else df_train
-    
     transforms = get_transfos(
         strength=config.aug_strength,
         crop=config.pretrain if hasattr(config, "pretrain") else False
     )
 
     train_dataset = ContrailDataset(
-        df_train_.reset_index(drop=True),
+        df_train,
         transforms=transforms,
         use_soft_mask=config.use_soft_mask,
         use_shape_descript=config.use_shape_descript,
@@ -74,7 +72,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         n_channels=config.n_channels,
         pretrained_weights=pretrained_weights,
         reduce_stride=config.reduce_stride,
-        upsample=config.upsample  if hasattr(config, "upsample") else False,
+        upsample=config.upsample if hasattr(config, "upsample") else False,
         use_pixel_shuffle=config.use_pixel_shuffle,
         use_hypercolumns=config.use_hypercolumns,
         center=config.center,
@@ -106,7 +104,7 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         print(f"    -> {len(val_dataset)} validation images")
         print(f"    -> {n_parameters} trainable parameters\n")
 
-    dices, step = fit(
+    dices = fit(
         model,
         train_dataset,
         val_dataset,
@@ -123,42 +121,6 @@ def train(config, df_train, df_val, fold, log_folder=None, run=None):
         run=run,
         fold=fold,
     )
-
-    if config.two_stage:
-        # Update params & data
-        config.epochs = 10
-        config.data_config['mix_proba'] = 0
-        config.optimizer_config['lr'] /= 2
-        config.optimizer_config['warmup_prop'] = 0.1
-        config.aug_strength = 0
-
-        train_dataset = ContrailDataset(
-            df_train,
-            transforms=get_transfos(strength=config.aug_strength),
-        )
-
-        if config.local_rank == 0:
-            print(f"\n    -> {len(train_dataset)} 2nd stage training images\n")
-
-        # Train
-        dices, _ = fit(
-            model,
-            train_dataset,
-            val_dataset,
-            config.data_config,
-            config.loss_config,
-            config.optimizer_config,
-            epochs=config.epochs,
-            verbose_eval=config.verbose_eval,
-            use_fp16=config.use_fp16,
-            distributed=config.distributed,
-            local_rank=config.local_rank,
-            world_size=config.world_size,
-            log_folder=log_folder,
-            run=run,
-            fold=fold,
-            resume_step=step
-        )
 
     if (log_folder is not None) and (config.local_rank == 0):
         save_model_weights(
@@ -205,7 +167,7 @@ def k_fold(config, df, df_extra=None, log_folder=None, run=None):
             val_idx = list(df[df["fold"] == fold].index)
 
             df_train = df.iloc[train_idx].reset_index(drop=True)
-            
+
             if hasattr(config, "pretrain"):
                 if config.pretrain:
                     df_train = pd.read_csv('../output/df_goes16_may.csv')

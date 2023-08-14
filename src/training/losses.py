@@ -1,5 +1,3 @@
-# TODO : remove useless losses
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,12 +7,42 @@ from training.lovasz import lovasz_sym
 
 
 class FocalLoss(nn.Module):
+    """
+    Focal Loss implementation.
+    Methods:
+        __init__(self, gamma=2, reduction="mean"):
+            Constructor for the FocalLoss class.
+        forward(self, input, target):
+            Forward pass of the focal loss.
+
+    Attributes:
+        gamma (float): The focal loss exponent.
+        reduction (str): The reduction applied to the output.
+    """
     def __init__(self, gamma=2, reduction="mean"):
+        """
+        Constructor.
+
+        Args:
+            gamma (float, optional): The focal loss exponent. Defaults to 2.
+            reduction (str, optional): Specifies the reduction to apply to the output.
+                Can be 'mean', 'sum', or 'none'. Defaults to 'mean'.
+        """
         super().__init__()
         self.gamma = gamma
         self.reduction = reduction
 
     def forward(self, input, target):
+        """
+        Compute the focal loss.
+
+        Args:
+            input (torch.Tensor): The predicted logits or probabilities.
+            target (torch.Tensor): The ground truth labels.
+
+        Returns:
+            torch.Tensor: The computed focal loss.
+        """
         # n = input.shape[-1]
         input = input.view(-1).float()
         target = target.view(-1).float()
@@ -28,12 +56,44 @@ class FocalLoss(nn.Module):
 
 
 class LovaszFocalLoss(nn.Module):
+    """
+    Combined Lovasz and Focal Loss implementation.
+
+    Methods:
+        __init__(self, gamma=2, alpha=0.7, reduction="mean"):
+            Constructor for the LovaszFocalLoss class.
+        forward(self, x, y):
+            Compute the combined Lovasz and Focal loss.
+
+    Attributes:
+        focal_loss (FocalLoss): The focal loss component.
+        alpha (float): The weight factor for the Lovasz loss.
+    """
     def __init__(self, gamma=2, alpha=0.7, reduction="mean"):
+        """
+        Constructor.
+
+        Args:
+            gamma (float, optional): The focal loss exponent. Defaults to 2.
+            alpha (float, optional): Weight factor for the Lovasz loss. Defaults to 0.7.
+            reduction (str, optional): Specifies the reduction to apply to the output.
+                Can be 'mean', 'sum', or 'none'. Defaults to 'mean'.
+        """
         super().__init__()
         self.focal_loss = FocalLoss(gamma, reduction=reduction)
         self.alpha = alpha
 
     def forward(self, x, y):
+        """
+        Compute the combined Lovasz and Focal loss.
+
+        Args:
+            x (torch.Tensor): The predicted logits or probabilities.
+            y (torch.Tensor): The ground truth labels.
+
+        Returns:
+            torch.Tensor: The computed combined loss.
+        """
         return self.focal_loss(x, y) + self.alpha * lovasz_sym(x, y, per_image=False)
 
 
@@ -51,7 +111,6 @@ class LovaszBCELoss(nn.Module):
         reduction (str, optional): Specifies the reduction to apply to the loss.
             Can be 'mean', 'sum', or 'none'. Defaults to 'mean'.
     """
-
     def __init__(self, alpha=0.01, reduction="mean"):
         """
         Constructor.

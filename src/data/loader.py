@@ -78,8 +78,6 @@ def define_loaders(
 ):
     """
     Define data loaders for training and validation datasets.
-    If `use_len_sampler` is True, the training data loader will use LenMatchBatchSampler to ensure
-    each batch has similar sequence lengths.
 
     If `distributed` is True, the data loaders will use DistributedSampler for shuffling the
     training dataset and OrderedDistributedSampler for sampling the validation dataset.
@@ -89,7 +87,6 @@ def define_loaders(
         val_dataset (Dataset): The validation dataset.
         batch_size (int): The batch size for training data loader. Default to 32.
         val_bs (int): The batch size for validation data loader. Default to 32.
-        use_len_sampler (bool): Whether to use the len sampler for training. Default to False.
         distributed (bool): Whether to use distributed training. Default to False.
         world_size (int): The total number of processes for distributed training. Default to 0.
         local_rank (int): The rank of the current process. Default to 0.

@@ -9,4 +9,4 @@ NUM_CLASSES = len(CLASSES)
 
 DEVICE = "cuda"
 
-NEPTUNE_PROJECT = "KagglingTheo/Contrails"
+NEPTUNE_PROJECT = "YOUR PROJECT"
